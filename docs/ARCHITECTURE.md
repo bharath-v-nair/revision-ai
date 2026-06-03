@@ -520,4 +520,66 @@ docker exec revisionai-postgres psql -U revisionai -d   # Verify
 
 ---
 
+## 14. PHASE 0.3 IMPLEMENTATION NOTES
+
+### Authentication System — JWT Bearer + Google OAuth + Email OTP
+
+Complete auth system with 5 API endpoints, 4 MediatR command/handlers, 4 infrastructure services, 3 FluentValidation validators, and JWT Bearer middleware.
+
+### Key Implementation Decisions
+
+1. **Interfaces in Application, Implementations in Infrastructure** — Following Clean Architecture's Dependency Inversion Principle, all service interfaces (`IJwtTokenService`, `IRefreshTokenService`, `IGoogleAuthService`, `IOtpService`, `IAppDbContext`) are defined in the Application layer. Infrastructure implements them. This keeps Application testable and free of external dependencies.
+
+2. **`IAppDbContext` abstraction** — The `AppDbContext` now implements `IAppDbContext` with `IQueryable<T>` properties (not `DbSet<T>`) and an `Add<T>` method. This allows Application handlers to query and mutate data without referencing `Microsoft.EntityFrameworkCore` directly.
+
+3. **JWT HS256 with config-driven key** — Access tokens are signed with HS256 using a key from `appsettings.json` (`Jwt:Key`). The key must be at least 32 characters. Issuer and audience are validated against `Jwt:Issuer` and `Jwt:Audience`. Claims: `sub` (userId), `email`, `displayName`, `jti` (unique token ID).
+
+4. **Refresh token rotation with revocation** — On each refresh, the old refresh token's `RevokedAt` is set to `DateTime.UtcNow`, and a new refresh token entity is created. This prevents token reuse attacks. In the `RefreshTokenCommandHandler`, access is denied if a token is not found, is revoked, or is expired.
+
+5. **OTP in-memory cache with sliding expiration** — `OtpService` uses ASP.NET Core's `IMemoryCache` with `MemoryCacheEntryOptions.SlidingExpiration = TimeSpan.FromMinutes(5)`. The sliding window means each validation attempt resets the timer. On successful verification, the OTP is invalidated via `_cache.Remove()`. Cache key: `otp:{normalized email}`.
+
+6. **`[DEV OTP]` console logging** — In development, the OTP is logged to Serilog console output with `[DEV OTP]` prefix. This enables immediate curl-based testing without an email provider. Production email sending (SendGrid/Resend) will replace this in Phase 5.2.
+
+7. **Google token validation via tokeninfo endpoint** — `GoogleAuthService` calls `https://oauth2.googleapis.com/tokeninfo?id_token={idToken}` to validate Google ID tokens. This simple HTTP GET approach avoids adding the entire Google API client library as a dependency. Returns `GoogleUserInfo` with `GoogleId`, `Email`, `Name`, and `Picture`.
+
+8. **`RefreshToken` namespace collision resolution** — The command folder path `Application/Auth/Commands/RefreshToken/` creates a namespace that shadows the `Domain.Entities.RefreshToken` type. Resolved with `using DomainRefreshToken =` alias in the conflicting handler, and fully qualified `Domain.Entities.RefreshToken` in other handlers.
+
+### Service Registration Pattern
+
+Services are registered in `Program.cs` using a double-registration pattern:
+```csharp
+builder.Services.AddSingleton<JwtTokenService>();          // Concrete
+builder.Services.AddSingleton<IJwtTokenService>(           // Interface → same instance
+    sp => sp.GetRequiredService<JwtTokenService>());
+```
+This ensures the same singleton instance serves both `JwtTokenService` and `IJwtTokenService` injection points.
+
+### API Endpoints
+
+| Method | Route | Auth | Handler |
+|--------|-------|------|---------|
+| POST | `/api/auth/google` | None | `GoogleLoginCommandHandler` — verify Google ID token, find/create user, return JWT |
+| POST | `/api/auth/email/send-otp` | None | `SendOtpCommandHandler` — generate 6-digit OTP, store in cache, log to console |
+| POST | `/api/auth/email/verify-otp` | None | `VerifyOtpCommandHandler` — validate OTP, create/find user, return JWT |
+| POST | `/api/auth/refresh` | None | `RefreshTokenCommandHandler` — check token valid/not revoked/not expired, revoke old, issue new |
+| POST | `/api/auth/logout` | None | `RefreshTokenCommandHandler` — revoke refresh token |
+
+### NuGet Packages Added
+- `Microsoft.IdentityModel.Tokens` 8.15.0 — JWT signing and validation
+- `System.IdentityModel.Tokens.Jwt` 8.15.0 — JWT handler
+- `FluentValidation` 12.0.0 — Request validation
+- `FluentValidation.AspNetCore` 11.3.1 — ASP.NET integration
+- `Serilog` 4.2.0 — Structured logging
+
+### Verification
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/RevisionAI.Api --launch-profile http
+curl -X POST http://localhost:5242/api/auth/email/send-otp -H "Content-Type: application/json" -d '{"email":"test@example.com"}'
+# → 200, OTP logged: [DEV OTP] OTP for test@example.com: 123456
+curl -X POST http://localhost:5242/api/auth/email/verify-otp -H "Content-Type: application/json" -d '{"email":"test@example.com","otp":"123456"}'
+# → 200 with AuthResponse (accessToken, refreshToken, expiresAt, user)
+```
+
+---
+
 *This document will be updated as architectural decisions are made during implementation.*

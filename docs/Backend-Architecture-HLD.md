@@ -7,15 +7,17 @@
 
 ## 1. API ENDPOINTS INVENTORY
 
-### 1.1 Authentication (Phase 0.3)
+### 1.1 Authentication (Phase 0.3) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Request | Response | Description |
-|--------|----------|------|---------|----------|-------------|
-| POST | `/api/auth/google` | None | `{ idToken: string }` | `AuthResponse` | Google OAuth login |
-| POST | `/api/auth/email/send-otp` | None | `{ email: string }` | `200 OK` | Send OTP to email |
-| POST | `/api/auth/email/verify-otp` | None | `{ email: string, otp: string }` | `AuthResponse` | Verify OTP & login |
-| POST | `/api/auth/refresh` | None | `{ refreshToken: string }` | `AuthResponse` | Refresh access token |
-| POST | `/api/auth/logout` | JWT | `{ refreshToken: string }` | `200 OK` | Revoke refresh token |
+| Method | Endpoint | Auth | Request | Response | Description | Status |
+|--------|----------|------|---------|----------|-------------|--------|
+| POST | `/api/auth/google` | None | `{ idToken: string }` | `AuthResponse` | Google OAuth login | ✅ Built |
+| POST | `/api/auth/email/send-otp` | None | `{ email: string }` | `200 OK` | Send OTP to email | ✅ Built |
+| POST | `/api/auth/email/verify-otp` | None | `{ email: string, otp: string }` | `AuthResponse` | Verify OTP & login | ✅ Built |
+| POST | `/api/auth/refresh` | None | `{ refreshToken: string }` | `AuthResponse` | Refresh access token | ✅ Built |
+| POST | `/api/auth/logout` | None | `{ refreshToken: string }` | `200 OK` | Revoke refresh token | ✅ Built |
+
+**Implementation:** `AuthController.cs` with 4 MediatR commands (GoogleLogin, SendOtp, VerifyOtp, RefreshToken). JWT Bearer middleware configured with HS256, 15-min access tokens, 7-day refresh tokens with rotation.
 
 ### 1.2 Questions (Phase 2.1)
 
@@ -351,15 +353,37 @@ ApiException (base)
 
 ---
 
-## 9. PHASE 0.1 STATUS
+## 9. SERVICE INVENTORY
 
-**Phase 0.1 (Project Scaffold): ✅ Complete**
+| Service | Layer | Interface | Purpose |
+|---------|-------|-----------|---------|
+| `JwtTokenService` | Infrastructure | `IJwtTokenService` | HS256 JWT generation (15-min access tokens) |
+| `RefreshTokenService` | Infrastructure | `IRefreshTokenService` | Cryptographic random refresh token generation (7-day) |
+| `GoogleAuthService` | Infrastructure | `IGoogleAuthService` | Google ID token validation via tokeninfo endpoint |
+| `OtpService` | Infrastructure | `IOtpService` | 6-digit OTP generation, IMemoryCache storage with 5-min sliding expiry |
+| `AppDbContext` | Infrastructure | `IAppDbContext` | EF Core PostgreSQL data access (20 DbSets) |
 
+All services follow Clean Architecture: interfaces defined in Application layer, implementations in Infrastructure.
+
+---
+
+## 10. PHASE STATUS
+
+### Phase 0.1 (Project Scaffold): ✅ Complete
 - .NET 10 solution with 5 Clean Architecture projects created
 - NuGet packages: MediatR 14.1, EF Core 10, Npgsql, BCrypt, Serilog, Swagger, JWT Bearer, Azure Blob
 - `dotnet build` succeeds with 0 errors, 0 warnings
-- No API endpoints implemented yet — controllers are empty
-- Phase 0.2 (Database Schema) and 0.3 (Auth) will populate the first endpoints
+
+### Phase 0.2 (Database Schema): ✅ Complete
+- 20 entities, 20 Fluent API configurations, InitialCreate migration
+- 21 tables, 60+ indexes, 40+ foreign keys
+- 19 medical subjects seeded
+
+### Phase 0.3 (Authentication): ✅ Complete
+- 5 auth endpoints, 4 MediatR commands/handlers
+- JWT Bearer middleware, Google OAuth, Email OTP
+- 26 new files across Contracts, Application, Infrastructure, and Api layers
+- Verified: send-otp (200), verify-otp (200), refresh (200), validation errors (400)
 
 ---
 

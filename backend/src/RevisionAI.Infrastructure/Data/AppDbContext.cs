@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using RevisionAI.Application.Common.Interfaces;
 using RevisionAI.Domain.Entities;
 using RevisionAI.Infrastructure.Data.Configurations;
 
 namespace RevisionAI.Infrastructure.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IAppDbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -29,6 +30,9 @@ public class AppDbContext : DbContext
     public DbSet<MockSession> MockSessions => Set<MockSession>();
     public DbSet<MockSessionAnswer> MockSessionAnswers => Set<MockSessionAnswer>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    IQueryable<User> IAppDbContext.Users => Users;
+    IQueryable<RefreshToken> IAppDbContext.RefreshTokens => RefreshTokens;
+    void IAppDbContext.Add<TEntity>(TEntity entity) => Add(entity);
     public DbSet<Achievement> Achievements => Set<Achievement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
