@@ -1,4 +1,6 @@
 using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using RevisionAI.Infrastructure.Data;
 using Serilog;
 
 // Configure Serilog with explicit console sink
@@ -21,8 +23,11 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
+    // Database — PostgreSQL via EF Core
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
     // TODO: Add authentication (Phase 0.3)
-    // TODO: Add DbContext (Phase 0.2)
     // TODO: Add CORS for Angular frontend
 
     WebApplication app = builder.Build();

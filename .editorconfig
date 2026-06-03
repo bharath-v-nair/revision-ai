@@ -1,5 +1,10 @@
 root = true
 
+# ===== Auto-generated Migration Files =====
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.CA1861.severity = none
+
 # ===== General =====
 [*]
 indent_style = space

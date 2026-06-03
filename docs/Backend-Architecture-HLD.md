@@ -200,23 +200,46 @@ AnswerHourlyQuestionCommandHandler
 
 ---
 
-## 3. DATABASE INDEX STRATEGY
+## 3. DATABASE INDEX STRATEGY (Phase 0.2 — Implemented)
 
 | Table | Column(s) | Type | Reason |
 |-------|-----------|------|--------|
 | Users | Email | UNIQUE | Auth lookup |
+| Users | GoogleId | UNIQUE (filtered: IS NOT NULL) | Google OAuth lookup |
 | Questions | SubjectId | BTREE | Filter by subject |
 | Questions | ChapterId | BTREE | Filter by chapter |
 | Questions | TopicId | BTREE | Filter by topic |
+| Questions | IsPYQ | BTREE | Filter PYQ questions |
+| QuestionMedia | QuestionId | BTREE | Get media for question |
+| QuestionSchedules | UserId | BTREE | Get user's schedules |
+| QuestionSchedules | NextReviewDate | BTREE | Get due reviews |
+| QuestionSchedules | (UserId, QuestionId) | UNIQUE | One schedule per user per question |
 | UserAttempts | UserId | BTREE | Get user's attempts |
 | UserAttempts | CreatedAt | BTREE | Date-range queries |
-| UserAttempts | (UserId, QuestionId) | BTREE | Check if question seen |
+| UserAttempts | (UserId, QuestionId) | COMPOSITE | Check if question attempted |
+| PendingQuestions | UserId | BTREE | Get user's pending questions |
 | PendingQuestions | ExpiresAt | BTREE | Expiry sweeper |
-| PendingQuestions | (UserId, IsAnswered, ExpiresAt) | COMPOSITE | Get pending questions |
-| QuestionSchedules | (UserId, NextReviewDate) | COMPOSITE | Get due reviews |
-| RefreshTokens | Token | UNIQUE | Token lookup |
-| Friendships | (RequesterId, AddresseeId) | UNIQUE | Prevent duplicates |
+| PendingQuestions | (UserId, IsAnswered, ExpiresAt) | COMPOSITE | Get unanswered pending Qs |
+| UserStreaks | UserId | UNIQUE | One streak record per user |
+| UserXp | UserId | UNIQUE | One XP record per user |
 | XpTransactions | UserId | BTREE | User XP history |
+| XpTransactions | CreatedAt | BTREE | Date-range XP queries |
+| BookmarkCollections | UserId | BTREE | Get user's collections |
+| BookmarkItems | CollectionId | BTREE | Get items in collection |
+| BookmarkItems | (CollectionId, QuestionId) | UNIQUE | Prevent duplicate bookmarks |
+| UserNotes | UserId | BTREE | Get user's notes |
+| UserNotes | QuestionId | BTREE | Notes tagged to question |
+| UserNotes | TopicId | BTREE | Notes tagged to topic |
+| Friendships | RequesterId | BTREE | Outgoing friend requests |
+| Friendships | AddresseeId | BTREE | Incoming friend requests |
+| Friendships | (RequesterId, AddresseeId) | UNIQUE | Prevent duplicate requests |
+| MockSessions | UserId | BTREE | Get user's mock sessions |
+| MockSessionAnswers | MockSessionId | BTREE | Get answers for mock |
+| MockSessionAnswers | (MockSessionId, QuestionId) | UNIQUE | One answer per question per mock |
+| RefreshTokens | Token | UNIQUE | Token lookup |
+| RefreshTokens | UserId | BTREE | Get user's tokens |
+| Achievements | UserId | BTREE | Get user's achievements |
+| Achievements | (UserId, AchievementKey) | UNIQUE | One unlock per achievement |
 
 ---
 

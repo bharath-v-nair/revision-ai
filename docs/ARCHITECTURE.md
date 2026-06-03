@@ -459,4 +459,65 @@ cd docker && docker compose up -d  # PostgreSQL + Azurite running
 
 ---
 
+## 13. PHASE 0.2 IMPLEMENTATION NOTES
+
+### Database Schema — 20 Tables, 20 EF Core Configurations
+
+The complete database schema has been implemented with 20 entity tables covering all core domain concepts:
+
+| # | Table | Purpose |
+|---|-------|---------|
+| 1 | `Users` | Student accounts (email, display name, Google OAuth) |
+| 2 | `Subjects` | 19 medical subjects seeded via migration |
+| 3 | `Chapters` | Subject chapters with page ranges |
+| 4 | `Topics` | Chapter topics with question counts |
+| 5 | `Questions` | Core MCQ entities (text, 4 options, correct answer, explanation) |
+| 6 | `QuestionMedia` | Clinical images, histology, radiology linked to questions |
+| 7 | `QuestionSchedules` | Per-user spaced repetition state (SM-2: ease factor, interval, next review) |
+| 8 | `UserAttempts` | Every question attempt with answer, correctness, timing, confidence |
+| 9 | `PendingQuestions` | Hourly question queue with per-user expiry |
+| 10 | `UserStreaks` | Daily streak tracking (current, longest, last active date) |
+| 11 | `UserXp` | Total XP and current level for gamification |
+| 12 | `XpTransactions` | Immutable XP audit trail with reason codes |
+| 13 | `BookmarkCollections` | Named collections (e.g., "High-Yield", "Weak Areas") |
+| 14 | `BookmarkItems` | Questions saved to collections |
+| 15 | `UserNotes` | Handwritten/digital drawing notes linked to questions or topics |
+| 16 | `Friendships` | Social connections (pending/accepted/declined) |
+| 17 | `MockSessions` | Custom quiz sessions with JSONB config |
+| 18 | `MockSessionAnswers` | Per-question answers within mock sessions |
+| 19 | `RefreshTokens` | JWT refresh tokens (7-day expiry, revocable) |
+| 20 | `Achievements` | Unlocked achievements (e.g., "7-day streak", "100 questions") |
+
+### Key Implementation Decisions
+
+1. **Fluent API over Data Annotations** — All entity configuration (20 config classes) in `Infrastructure/Data/Configurations/`. Domain entities are pure POCOs with no EF dependencies.
+
+2. **Delete Behavior** — `Cascade` for child entities owned by a parent (UserAttempts → User). `Restrict` for reference data (Questions → Subjects). `SetNull` for optional relationships (Question → Topic).
+
+3. **Indexed query paths** — Composite indexes on hot query patterns: `(UserId, QuestionId)` on UserAttempts, `(UserId, IsAnswered, ExpiresAt)` on PendingQuestions, `(UserId, QuestionId)` unique constraint on QuestionSchedules.
+
+4. **JSONB for MockConfig** — `MockSessions.MockConfig` stores flexible mock generation parameters as PostgreSQL JSONB, enabling schema-less configuration without migrations.
+
+5. **Seed data via migration** — 19 medical subjects seeded using `HasData()` with deterministic GUIDs for repeatability across environments.
+
+6. **PostgreSQL text columns** — `QuestionText`, all `Option*`, `Explanation` use `text` type for unlimited length (some medical explanations are 1000+ characters).
+
+7. **CA1861 suppression for migrations** — Auto-generated migration files get `generated_code = true` in `.editorconfig` to suppress constant-array analyzer warnings that are harmless in migrations.
+
+8. **CorrectOption stored but hidden at API level** — The DB stores the correct answer. The query layer (Application) controls whether to include it.
+
+### Schema Statistics
+- 20 tables, 60+ indexes, 40+ foreign keys
+- Migration file: ~40KB SQL in `20260603205756_InitialCreate.cs`
+- Ready for Phase 0.3 (Authentication System)
+
+### Verification Commands
+```bash
+cd backend && dotnet build                              # 0 errors, 0 warnings
+docker exec revisionai-postgres psql -U revisionai -d   # Verify
+  revisionai -c "SELECT COUNT(*) FROM \"Subjects\";"    # 19
+```
+
+---
+
 *This document will be updated as architectural decisions are made during implementation.*
