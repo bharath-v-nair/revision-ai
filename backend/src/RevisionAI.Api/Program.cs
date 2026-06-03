@@ -26,10 +26,7 @@ try
     builder.Host.UseSerilog();
 
     // Add services
-builder.Services.AddControllers(options =>
-{
-    options.Filters.Add<RevisionAI.Api.Filters.ValidationExceptionFilter>();
-});
+    builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
@@ -84,6 +81,27 @@ builder.Services.AddControllers(options =>
     builder.Services.AddAuthorization();
 
     WebApplication app = builder.Build();
+
+    // Middleware: Catch FluentValidation exceptions and return 400 instead of 500
+    app.Use(async (context, next) =>
+    {
+        try
+        {
+            await next(context);
+        }
+        catch (FluentValidation.ValidationException ex)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/json";
+            var errors = ex.Errors.Select(e => e.ErrorMessage).ToList();
+            await context.Response.WriteAsJsonAsync(new
+            {
+                title = "Validation Error",
+                detail = string.Join("; ", errors),
+                status = StatusCodes.Status400BadRequest
+            });
+        }
+    });
 
     // Configure pipeline
     if (app.Environment.IsDevelopment())
