@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RevisionAI.Api/RevisionAI.Api.csproj" />
+    <Project Path="src/RevisionAI.Application/RevisionAI.Application.csproj" />
+    <Project Path="src/RevisionAI.Contracts/RevisionAI.Contracts.csproj" />
+    <Project Path="src/RevisionAI.Domain/RevisionAI.Domain.csproj" />
+    <Project Path="src/RevisionAI.Infrastructure/RevisionAI.Infrastructure.csproj" />
+  </Folder>
+</Solution>

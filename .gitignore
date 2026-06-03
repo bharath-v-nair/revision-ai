@@ -1,0 +1,81 @@
+# ===== .NET =====
+bin/
+obj/
+*.user
+*.suo
+*.DotSettings.user
+*.csproj.user
+*.sln.docstates
+.vs/
+packages/
+*.nupkg
+
+# ===== Node / Angular =====
+node_modules/
+dist/
+.output/
+.angular/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# ===== Environment =====
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+*.local.json
+
+# ===== IDE =====
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== Pipeline =====
+pipeline/output/**/*.png
+pipeline/output/**/*.pdf
+!pipeline/output/.gitkeep
+
+# ===== Source PDFs (Do NOT commit) =====
+RevisionAIDocPipeline/
+
+# ===== Internal / Personal Docs (Not for GitHub) =====
+HANDWRITTEN_PLAN_FROM_ME.md
+PRD.md
+PHASES.md
+AGENTS.md
+docs/Interview.md
+docs/PostMortem-*.md
+
+# ===== Auto-generated =====
+frontend/README.md
+
+# ===== Azure =====
+*.azurepubxml
+*.pubxml.user
+
+# ===== Misc =====
+*.orig
+*.tmp
+*.temp
