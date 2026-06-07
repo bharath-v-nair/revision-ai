@@ -19,21 +19,24 @@
 
 **Implementation:** `AuthController.cs` with 4 MediatR commands (GoogleLogin, SendOtp, VerifyOtp, RefreshToken). JWT Bearer middleware configured with HS256, 15-min access tokens, 7-day refresh tokens with rotation.
 
-### 1.2 Questions (Phase 2.1)
+### 1.2 Questions (Phase 2.1) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| GET | `/api/questions` | JWT | `?subjectSlug=&chapterId=&topicId=&isPYQ=&search=&page=1&pageSize=10` | Paginated question list (no answers) |
-| GET | `/api/questions/{id:guid}` | JWT | — | Full question detail (with answer) |
-| GET | `/api/questions/{id:guid}/media` | JWT | — | Linked media references |
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| GET | `/api/questions` | None | `?subjectSlug={slug}&chapterNumber={n}&page=1&pageSize=20` | `{ data: [QuestionDto], meta: { page, pageSize, totalCount, hasNext } }` | Paginated question list. Hides CorrectOption + Explanation. |
+| GET | `/api/questions/{id:guid}` | None | — | `{ data: QuestionDetailDto }` | Full question detail (includes CorrectOption, Explanation, Media[]) |
+| GET | `/api/questions/{id:guid}/media` | None | — | `{ data: [MediaDto] }` | Linked media references for a question |
 
-### 1.3 Subjects, Chapters, Topics (Phase 2.1)
+**Implementation:** `QuestionsController.cs` with 3 endpoints injecting `IMediator`. Uses CQRS pattern: `GetQuestionsQuery` (paginated, filters by subjectSlug + optional chapterNumber, max 100 per page), `GetQuestionDetailQuery` (uses `.Select()` projection with Included media), `GetQuestionMediaQuery` (returns media list or null for 404). All queries use `AsNoTracking()`. QuestionDto excludes CorrectOption and Explanation. QuestionDetailDto includes both.
 
-| Method | Endpoint | Auth | Params | Description |
-|--------|----------|------|--------|-------------|
-| GET | `/api/subjects` | JWT | — | All 19 subjects with question counts |
-| GET | `/api/subjects/{id:guid}/chapters` | JWT | — | Chapters for a subject |
-| GET | `/api/chapters/{id:guid}/topics` | JWT | — | Topics for a chapter |
+### 1.3 Subjects & Chapters (Phase 2.1) ✅ COMPLETE
+
+| Method | Endpoint | Auth | Params | Response | Description |
+|--------|----------|------|--------|----------|-------------|
+| GET | `/api/subjects` | None | — | `{ data: [SubjectDto] }` | All subjects with question counts (SubjectDto: id, name, slug, iconName, questionCount) |
+| GET | `/api/subjects/{subjectSlug}/chapters` | None | — | `{ data: [ChapterDto] }` | Chapters for a subject, ordered by ChapterNumber. 404 if subject not found. (ChapterDto: id, chapterNumber, title, startPage, endPage, questionCount) |
+
+**Implementation:** `SubjectsController.cs` with 2 endpoints injecting `IMediator`. Uses CQRS pattern: `GetSubjectsQuery` (returns all subjects with question counts via `s.Questions.Count`), `GetSubjectChaptersQuery` (finds subject by slug, returns null for 404, returns chapters with question counts). All queries use `AsNoTracking()`. SubjectSlug matching is direct comparison (slugs stored lowercase in DB).
 
 ### 1.4 Hourly Questions (Phase 2.2)
 

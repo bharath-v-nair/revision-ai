@@ -580,6 +580,218 @@ curl -X POST http://localhost:5242/api/auth/email/verify-otp -H "Content-Type: a
 # → 200 with AuthResponse (accessToken, refreshToken, expiresAt, user)
 ```
 
+
+---
+
+## 15. PHASE 1.1 IMPLEMENTATION NOTES
+
+### TOC Extraction — PyMuPDF + Gemini Vision
+
+Extracted chapter names and page ranges from 20 medical subject PDFs (19 subjects + 1 PYQ) using an agentic IDE approach with Antigravity + Gemini 3.1 Pro Vision.
+
+### Key Implementation Decisions
+
+1. **Agentic IDE (Antigravity) over Python script pipeline** — Phase 1.1 is a one-time extraction task. Writing, debugging, and maintaining a Python script for a single run would add ~2 hours of overhead. Antigravity has PyMuPDF built-in and Gemini Vision natively — it can iterate across 20 files in a single conversation without external dependencies.
+
+2. **100% vision-based extraction** — Indian medical PDFs (Marrow Edition 8) have corrupt embedded text layers from machine OCR on scanned pages. `page.get_text()` returns garbled Unicode. Every contents page is rendered to 150 DPI PNG and read by Gemini 3.1 Pro Vision. Zero reliance on PDF text layers.
+
+3. **Built-in Gemini over external API** — Antigravity's built-in Gemini 3.1 Pro can read images directly in the chat. Avoiding external API calls eliminated credential management, reduced cost to $0, and simplified the workflow.
+
+4. **Per-subject TOC JSON files** — 20 separate `toc_{subject}.json` files rather than a single monolithic file. Easier to diff, validate, and use as independent inputs for Phase 1.2 (PDF Slicer).
+
+5. **PYQ handled as exams, not chapters** — The Previous Years PDF contains questions grouped by exam (AIIMS 2017, NEET PG 2019, etc.), not by chapter. The TOC structure reflects this: exam names + start pages instead of chapter title + page ranges.
+
+### Output Structure
+```
+pipeline/output/{subject}/toc.json
+pipeline/output/{subject}/contents_pages/   (rendered PNGs)
+
+toc.json format:
+{
+  "subject": "Anaesthesia",
+  "sourcePdf": "Subject wise/Anaesthesia_ed8.pdf",
+  "chapters": [
+    { "title": "...", "chapterNumber": 1, "startPage": 1, "estimatedEndPage": 8 }
+  ]
+}
+```
+
+### Verification
+- 20 subjects, 829 chapters extracted
+- 0 issues after fixing last-chapter end-page bug
+- Python validation script checks page number sequentiality, last chapter boundaries, required fields
+
+### Key Bug: Last Chapter estimatedEndPage
+The initial extraction set `estimatedEndPage == startPage` for every subject's last chapter. The "next chapter startPage - 1" formula has no next chapter for the final chapter. Fixed by using `doc.page_count` from PyMuPDF as the final chapter's end boundary.
+
+
+---
+
+## 16. PHASE 1.2+1.3 IMPLEMENTATION NOTES
+
+### Streaming Extraction Pipeline — Y-Coordinate Interleaving + Gemini Vision
+
+Merged PDF slicing, page rendering, and vision parsing into a single streaming pipeline. Pages rendered in RAM, streamed to Gemini 3.1 Pro Vision, and discarded — only final JSON + image assets persist to disk (~55 MB per subject vs ~4.5 GB in the original sequential plan).
+
+### Key Implementation Decisions
+
+1. **Merge Phase 1.2+1.3 into streaming pipeline** — The original plan called for sequential phases: slice PDFs → render PNGs to disk → parse PNGs with vision AI. This would have stored ~4.5 GB of intermediate artifacts. The merged approach renders pages in RAM, sends them directly to Gemini Vision, and discards them. Only `chapter_N_questions.json` + extracted image assets persist.
+
+2. **Y-coordinate interleaving for deterministic image anchoring** — `extract_interleaved.py` uses PyMuPDF to find exact (X, Y) bounding box coordinates for every text block and image on a page. Sorting strictly by Y-coordinate produces a timeline where images are mathematically positioned relative to text. This replaces probabilistic AI spatial reasoning with deterministic math — zero cross-page image misassignment.
+
+3. **5-stage schema evolution** — The question JSON format evolved through 5 iterations: from flat `optionA`-`optionD` with bare `questionAssets[]` strings → to `options: {a, b, c, d}` with structured `media[]` objects containing `mediaType`, `description`, `filename`, and `pageNumber`. `fix_schema.py` auto-normalizes all formats to the target.
+
+4. **`hasMedia`/`explanationHasMedia` pattern** — Boolean flags determine whether to include `media[]` or `explanationMedia[]` arrays. When false, both the flag and array are omitted entirely. When true, media objects contain typed metadata (`ClinicalImage`, `Diagram`, `Table`) enabling the frontend to render appropriately.
+
+5. **Semantic asset filenames** — `img_{pageNumber}_{q|e}{questionNumber}_{index}.jpeg` convention. Example: `img_348_q1_1.jpeg` = Page 348, Question 1, Image 1. `img_354_e1_1.jpeg` = Page 354, Explanation 1, Image 1. Instantly traceable to source.
+
+6. **Tables as inline Markdown** — Tables are converted to Markdown format and placed directly within the `explanation` string. Separating tables as image assets would lose searchability and add rendering latency. Complex tables that can't be rendered in Markdown are extracted as image assets.
+
+7. **Drop `difficulty` field** — AI cannot reliably judge question difficulty from text alone. Difficulty is populated from analytics (Phase 2) using student pass rates and time data.
+
+8. **Dual-path execution strategy** — Pipeline-SOP.md defines two paths: (A) Antigravity native vision for prototyping (~25 chapters/day, zero API cost, rate-limited), (B) Gemini API via `google-genai` SDK for production scale (1,500 requests/day free tier, throttled at 4 seconds between calls).
+
+### Pipeline Scripts Created
+
+| Script | Purpose |
+|--------|---------|
+| `extract_interleaved.py` | PyMuPDF bounding box extraction + Y-coordinate interleaved timeline generation |
+| `fix_schema.py` | Auto-normalizes 5 schema versions to unified target |
+| `validator.py` | 10 validation checks per question + audit report generation |
+
+### Output Structure
+```
+pipeline/output/anaesthesia/
+├── chapter_19/
+│   ├── chapter_19_questions.json
+│   └── assets/img_348_q1_1.jpeg, img_354_e1_1.jpeg, ...
+├── chapter_22/
+│   ├── chapter_22_questions.json
+│   └── assets/...
+└── audit_report.json + audit_summary.md
+```
+
+### Verification
+- Anaesthesia: 25 chapters, 551 questions extracted
+- 534/551 pass validation (96.9%)
+- Total disk usage: ~55 MB (vs ~4.5 GB in original plan)
+- Zero cross-page image anchoring errors after Y-coordinate interleaving
+
+---
+
+## 17. PHASE 2.1: QUESTIONS API IMPLEMENTATION NOTES
+
+**Date:** June 6, 2026
+**Status:** ✅ Complete
+
+### 17.1 Architecture Pattern: CQRS with MediatR
+
+All 5 endpoints follow the same CQRS pattern established in Phase 0.3:
+
+```
+Controller (Api layer)
+  → IMediator.Send(Query)
+    → QueryHandler (Application layer)
+      → IAppDbContext (Infrastructure layer)
+        → PostgreSQL
+```
+
+Controllers inject `IMediator`, create a Query object, send it, and map the response to HTTP status codes. Handlers use `IAppDbContext` with `AsNoTracking()` and `.Select()` projection — no entities are ever returned to the API surface.
+
+### 17.2 DTO Design
+
+| DTO | Used By | Includes |
+|-----|---------|----------|
+| `SubjectDto` | `GET /api/subjects` | id, name, slug, iconName, questionCount |
+| `ChapterDto` | `GET /api/subjects/{slug}/chapters` | id, chapterNumber, title, startPage, endPage, questionCount |
+| `QuestionDto` | `GET /api/questions` (list) | id, questionNumber, questionText, options(A/B/C/D), hasMedia, sourcePage, subjectName, chapterTitle — **NO CorrectOption, NO Explanation** |
+| `QuestionDetailDto` | `GET /api/questions/{id}` (detail) | All of QuestionDto + CorrectOption, Explanation, Media[] |
+| `MediaDto` | Detail + media endpoints | id, mediaType, description, blobUrl, pageNumber |
+| `MetaDto` | Paginated responses | page, pageSize, totalCount, hasNext |
+
+**Design principle:** The list endpoint deliberately omits `CorrectOption` and `Explanation` to prevent answer leakage when students browse questions. Only the single-question detail endpoint reveals the answer.
+
+### 17.3 Pagination Strategy
+
+```csharp
+int page = Math.Max(1, request.Page);
+int pageSize = Math.Clamp(request.PageSize, 1, 100);
+int totalCount = await query.CountAsync(cancellationToken);
+List<QuestionDto> questions = await query
+    .OrderBy(q => q.QuestionNumber)
+    .Skip((page - 1) * pageSize)
+    .Take(pageSize)
+    .Select(...)
+    .ToListAsync(cancellationToken);
+```
+
+- Count is computed BEFORE pagination for accurate metadata
+- Page is floored at 1, pageSize is clamped to [1, 100]
+- Ordering by `QuestionNumber` ensures consistent pagination
+
+### 17.4 404 Handling Pattern
+
+Handlers that can return "not found" use nullable response types:
+
+```csharp
+// Handler returns IRequest<TResponse?> — nullable for 404 cases
+public class GetSubjectChaptersQuery : IRequest<GetSubjectChaptersResponse?> { ... }
+public class GetQuestionsQuery : IRequest<GetQuestionsResponse?> { ... }
+public class GetQuestionDetailQuery : IRequest<GetQuestionDetailResponse?> { ... }
+
+// Handler: return null when entity not found
+if (subject is null) return null;
+
+// Controller: check null and return 404
+if (result is null) return NotFound();
+```
+
+This avoids throwing exceptions for normal control flow and keeps handlers as pure data fetchers.
+
+### 17.5 Files Created (22 total)
+
+```
+Application/Subjects/Queries/GetSubjects/
+├── SubjectDto.cs
+├── GetSubjectsResponse.cs
+├── GetSubjectsQuery.cs
+└── GetSubjectsQueryHandler.cs
+
+Application/Subjects/Queries/GetSubjectChapters/
+├── ChapterDto.cs
+├── GetSubjectChaptersResponse.cs
+├── GetSubjectChaptersQuery.cs
+└── GetSubjectChaptersQueryHandler.cs
+
+Application/Questions/Queries/GetQuestions/
+├── QuestionDto.cs
+├── GetQuestionsResponse.cs
+├── GetQuestionsQuery.cs
+└── GetQuestionsQueryHandler.cs
+
+Application/Questions/Queries/GetQuestionDetail/
+├── QuestionDetailDto.cs
+├── MediaDto.cs
+├── GetQuestionDetailResponse.cs
+├── GetQuestionDetailQuery.cs
+├── GetQuestionDetailQueryHandler.cs
+├── GetQuestionMediaResponse.cs
+├── GetQuestionMediaQuery.cs
+└── GetQuestionMediaQueryHandler.cs
+
+Api/Controllers/
+├── SubjectsController.cs
+└── QuestionsController.cs
+```
+
+### 17.6 Conventions Enforced
+
+- **Explicit types:** No `var` usage — project enforces `csharp_style_var_elsewhere = false` with `TreatWarningsAsErrors`
+- **Slug matching:** Direct comparison (no `.ToLower()`) since DB stores slugs lowercase from Phase 1.5 seeding
+- **`AsNoTracking()`:** All read queries use it for performance
+- **`.Select()` projection:** No entity materialization — DTOs are projected directly in SQL
+- **0 errors, 0 warnings:** `dotnet build` passes clean
+
 ---
 
 *This document will be updated as architectural decisions are made during implementation.*

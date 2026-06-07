@@ -30,8 +30,6 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<MockSession> MockSessions => Set<MockSession>();
     public DbSet<MockSessionAnswer> MockSessionAnswers => Set<MockSessionAnswer>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-    IQueryable<User> IAppDbContext.Users => Users;
-    IQueryable<RefreshToken> IAppDbContext.RefreshTokens => RefreshTokens;
     void IAppDbContext.Add<TEntity>(TEntity entity) => Add(entity);
     public DbSet<Achievement> Achievements => Set<Achievement>();
 

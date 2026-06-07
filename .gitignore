@@ -59,6 +59,7 @@ pipeline/output/**/*.pdf
 
 # ===== Source PDFs (Do NOT commit) =====
 RevisionAIDocPipeline/
+pipeline/
 
 # ===== Internal / Personal Docs (Not for GitHub) =====
 HANDWRITTEN_PLAN_FROM_ME.md
@@ -80,3 +81,15 @@ frontend/README.md
 *.orig
 *.tmp
 *.temp
+
+#==== Setup ====
+RevisionAI-Setup/
+docs/friend-setup/
+docs/ACCOUNT_B_PRIMER.txt
+docs/Pipeline-SOP.md
+
+#===== Extraction =====
+extract_radiology_toc.py
+
+#===== Scratch / Temp Files =====
+scratch/

@@ -18,9 +18,58 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    string[] cliArgs = args;
+
+    // ---- CLI seeding mode: dotnet run -- --seed anaesthesia ----
+    if (cliArgs.Contains("--seed"))
+    {
+        await RunSeeder(cliArgs);
+        return 0;
+    }
+
+    await RunApiServer(cliArgs);
+    return 0;
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+    return 1;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+static async Task RunSeeder(string[] cliArgs)
+{
+    Log.Information("CLI seeding mode activated.");
+
+    string subjectName = cliArgs
+        .SkipWhile(a => a != "--seed")
+        .Skip(1)
+        .FirstOrDefault() ?? "anaesthesia";
+
+    WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
+    builder.Host.UseSerilog();
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+    WebApplication app = builder.Build();
+
+    using IServiceScope scope = app.Services.CreateScope();
+    AppDbContext dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    ILogger<AppDbContext> logger = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
+
+    (int inserted, int skipped) = await SeedQuestions.SeedSubjectAsync(dbContext, logger, subjectName);
+    Log.Information("Seeding completed: {Inserted} inserted, {Skipped} skipped", inserted, skipped);
+}
+
+static async Task RunApiServer(string[] cliArgs)
+{
     Log.Information("Starting RevisionAI API...");
 
-    WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+    WebApplicationBuilder builder = WebApplication.CreateBuilder(cliArgs);
 
     // Use Serilog for ASP.NET logging
     builder.Host.UseSerilog();
@@ -116,13 +165,5 @@ try
     app.MapControllers();
 
     Log.Information("RevisionAI API running on {Url}", app.Urls.FirstOrDefault() ?? "http://localhost:5242");
-    app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
+    await app.RunAsync();
 }
