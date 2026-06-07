@@ -11,6 +11,8 @@ public interface IAppDbContext
     DbSet<Question> Questions { get; }
     DbSet<QuestionMedia> QuestionMedia { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<UserAttempt> UserAttempts { get; }
+    DbSet<PendingQuestion> PendingQuestions { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

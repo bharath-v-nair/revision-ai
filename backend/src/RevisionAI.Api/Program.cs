@@ -103,6 +103,9 @@ static async Task RunApiServer(string[] cliArgs)
     builder.Services.AddSingleton<OtpService>();
     builder.Services.AddSingleton<IOtpService>(sp => sp.GetRequiredService<OtpService>());
 
+    // Background Services
+    builder.Services.AddHostedService<HourlyQuestionService>();
+
     // Authentication — JWT Bearer
     string? jwtKey = builder.Configuration["Jwt:Key"];
     string? jwtIssuer = builder.Configuration["Jwt:Issuer"];

@@ -56,6 +56,8 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, AuthRes
             _context.Add(user);
         }
 
+        user.LastLoginAt = DateTime.UtcNow;
+
         // 4. Generate tokens
         string accessToken = _jwtTokenService.GenerateAccessToken(user);
         Domain.Entities.RefreshToken refreshToken = _refreshTokenService.GenerateRefreshToken(user);

@@ -795,3 +795,150 @@ Api/Controllers/
 ---
 
 *This document will be updated as architectural decisions are made during implementation.*
+
+---
+
+## 18. PHASE 2.2: HOURLY QUESTION ENGINE IMPLEMENTATION NOTES
+
+**Date:** June 7, 2026
+**Status:** ✅ Complete
+
+### 18.1 Architecture Overview
+
+Phase 2.2 introduces a scheduled question delivery system with two components:
+
+1. **HourlyQuestionService** (BackgroundService) — runs every hour on the hour, selects 2 random questions, and creates `PendingQuestion` records for all active users.
+2. **3 API endpoints** — retrieve pending questions, answer them, and browse history — all following the CQRS pattern.
+
+```
+HourlyQuestionService (BackgroundService, PeriodicTimer)
+  → IServiceScopeFactory → IAppDbContext
+    → Users (LastLoginAt >= 7 days ago)
+    → Questions (random 2)
+    → PendingQuestions (INSERT)
+
+HourlyQuestionsController [Authorize]
+  → IMediator.Send(Query/Command)
+    → QueryHandler/CommandHandler (Application layer)
+      → IAppDbContext (Infrastructure layer)
+        → PostgreSQL
+```
+
+### 18.2 Domain Change: LastLoginAt
+
+`User.LastLoginAt` (DateTime?) was added to the User entity to track active users. Both `GoogleLoginCommandHandler` and `VerifyOtpCommandHandler` set this on every successful login. Active users are defined as those with `LastLoginAt` within the last 7 days.
+
+**Migration:** `20260607020510_AddUserLastLoginAt`
+
+### 18.3 IAppDbContext Expansion
+
+Two DbSets were added to support the new handlers:
+- `DbSet<UserAttempt> UserAttempts` — for checking previously attempted questions
+- `DbSet<PendingQuestion> PendingQuestions` — for creating and querying the pending queue
+
+### 18.4 HourlyQuestionService Design
+
+| Decision | Rationale |
+|----------|-----------|
+| **Uniform questions** | Same 2 questions for ALL eligible users this hour (simpler implementation, ensures fairness) |
+| **Active user window: 7 days** | Users who haven't logged in within a week stop receiving questions |
+| **Queue cap: 48** | Prevents unbounded queue growth (2 Q/hr × 24 hrs = 48 max) |
+| **24-hour expiry** | Questions auto-expire after 24 hours; expired questions appear in history but not in pending list |
+| **PeriodicTimer + top-of-hour alignment** | First tick aligns to the next `:00` mark, then fires every 60 minutes |
+| **IServiceScopeFactory** | Background services are singletons; scoped DbContext is created per execution |
+
+**Exclusion logic:** For each selected question, skip if the user has:
+- Already attempted it (exists in `UserAttempts` for this `UserId` + `QuestionId`)
+- Already has it pending (exists in `PendingQuestions` for this `UserId` + `QuestionId`)
+
+### 18.5 DTO Design
+
+| DTO | Used By | Includes |
+|-----|---------|----------|
+| `PendingQuestionDto` | `GET /api/hourly-questions` | pendingQuestionId, expiresAt, Question (QuestionWithoutAnswersDto) |
+| `QuestionWithoutAnswersDto` | Pending + History endpoints | id, questionNumber, questionText, options(A/B/C/D), hasMedia, sourcePage, subjectName, chapterTitle — **NO CorrectOption, NO Explanation** |
+| `AnswerQuestionResponse` | `POST /api/hourly-questions/{id}/answer` | isCorrect, correctOption, explanation — **answers ARE included** |
+| `HourlyHistoryDto` | `GET /api/hourly-questions/history` | pendingQuestionId, expiresAt, isAnswered, answeredAt, userAnswer, Question (QuestionWithoutAnswersDto) |
+
+**Design principle:** List and history endpoints hide answers. Only the answer endpoint reveals `CorrectOption` and `Explanation` — and only after the user submits their answer.
+
+### 18.6 API Endpoints
+
+| Method | Route | Auth | Handler |
+|--------|-------|------|---------|
+| GET | `/api/hourly-questions` | JWT | `GetPendingQuestionsQueryHandler` — returns unanswered, unexpired questions ordered by CreatedAt ASC (oldest first) |
+| POST | `/api/hourly-questions/{pendingQuestionId:guid}/answer` | JWT | `AnswerQuestionCommandHandler` — validates ownership/expiry/not-answered, checks correctness, creates UserAttempt (SessionType="Hourly"), marks IsAnswered=true |
+| GET | `/api/hourly-questions/history?page=1&pageSize=20` | JWT | `GetHourlyHistoryQueryHandler` — returns paginated history of answered + expired questions ordered by CreatedAt DESC |
+
+### 18.7 Answer Validation
+
+The `AnswerQuestionCommandHandler` performs inline validation (no separate FluentValidation validator):
+
+1. **Ownership check:** `PendingQuestion.UserId == request.UserId` — 400 if not found
+2. **Expiry check:** `ExpiresAt > DateTime.UtcNow` — 400 if expired
+3. **Already answered check:** `!IsAnswered` — 400 if already answered
+4. **Correctness:** Compares `request.SelectedOption[0].ToUpper()` against `Question.CorrectOption`
+5. **UserAttempt created:** With `SessionType = "Hourly"`, `AttemptNumber = 1`, `TimeTakenMs = 0`
+
+All validation failures throw `FluentValidation.ValidationException`, caught by the global middleware in `Program.cs` and returned as HTTP 400.
+
+### 18.8 History Query Design
+
+The history query joins `PendingQuestions` with `UserAttempts` on `(UserId, QuestionId)` where `SessionType = "Hourly"` to derive:
+- `answeredAt` → `UserAttempt.CreatedAt`
+- `userAnswer` → `UserAttempt.SelectedOption.ToString()`
+
+Questions that expired without being answered show `isAnswered = false`, `answeredAt = null`, `userAnswer = null`.
+
+### 18.9 What Phase 2.2 Defers
+
+| Feature | Phase | Reason |
+|---------|-------|--------|
+| XP awards for answers | 2.8 | Gamification system not yet built |
+| Streak tracking | 2.8 | Depends on UserStreak entity + logic |
+| SM-2 spaced repetition | 2.4 | Separate engine, separate phase |
+| Hearts/lives system | 3.8 | Not needed for basic hourly delivery |
+| Push notifications | 3.3 | Requires Firebase/Azure Notification Hub |
+
+### 18.10 Files Created/Modified (19 total)
+
+**New files (14):**
+```
+Application/HourlyQuestions/
+├── Commands/AnswerQuestion/
+│   ├── AnswerQuestionCommand.cs
+│   ├── AnswerQuestionResponse.cs
+│   └── AnswerQuestionCommandHandler.cs
+├── Queries/GetPendingQuestions/
+│   ├── GetPendingQuestionsQuery.cs
+│   ├── GetPendingQuestionsResponse.cs
+│   ├── PendingQuestionDto.cs
+│   └── GetPendingQuestionsQueryHandler.cs
+└── Queries/GetHourlyHistory/
+    ├── GetHourlyHistoryQuery.cs
+    ├── GetHourlyHistoryResponse.cs
+    ├── HourlyHistoryDto.cs
+    └── GetHourlyHistoryQueryHandler.cs
+
+Infrastructure/Services/
+└── HourlyQuestionService.cs
+
+Api/Controllers/
+└── HourlyQuestionsController.cs
+```
+
+**Modified files (5):**
+```
+Domain/Entities/User.cs                        — Added LastLoginAt
+Application/Common/Interfaces/IAppDbContext.cs  — Added UserAttempts, PendingQuestions
+Application/Auth/Commands/GoogleLogin/GoogleLoginCommandHandler.cs — Set LastLoginAt
+Application/Auth/Commands/VerifyOtp/VerifyOtpCommandHandler.cs    — Set LastLoginAt
+Api/Program.cs                                  — Registered HourlyQuestionService
+```
+
+**Migration:** `20260607020510_AddUserLastLoginAt.cs`
+
+### 18.11 Verification
+```bash
+cd backend && dotnet build  # 0 errors, 0 warnings
+```

@@ -65,6 +65,8 @@ public class GoogleLoginCommandHandler : IRequestHandler<GoogleLoginCommand, Aut
             }
         }
 
+        user.LastLoginAt = DateTime.UtcNow;
+
         // 3. Generate tokens
         string accessToken = _jwtTokenService.GenerateAccessToken(user);
         Domain.Entities.RefreshToken refreshToken = _refreshTokenService.GenerateRefreshToken(user);

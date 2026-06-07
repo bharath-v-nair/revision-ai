@@ -8,6 +8,7 @@ public class User
     public string? AvatarUrl { get; set; }
     public string? GoogleId { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? LastLoginAt { get; set; }
 
     // Navigation properties
     public ICollection<UserAttempt> UserAttempts { get; set; } = new List<UserAttempt>();
