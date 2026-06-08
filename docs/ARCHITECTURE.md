@@ -1151,6 +1151,46 @@ Api/RevisionAI.Api.http  (updated)
 
 ---
 
+## 21. Phase 2.5 — Analysis Engine ✅ COMPLETE
+
+### 21.1 Overview
+Read-only analytics layer operating on existing `UserAttempt` data. 3 aggregate-heavy endpoints: batch question stats, user dashboard (streak/XP/subject accuracy), and per-question attempt history with SR state. No new entities or migrations.
+
+### 21.2 API Endpoints
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/analysis/batch` | JWT | Combined stats: totalQuestions, correctCount, incorrectCount, accuracyPercentage, averageTimeMs |
+| GET | `/api/analysis/dashboard` | JWT | Dashboard: stats, streakDays, totalXp, currentLevel, weakestSubject, strongestSubject |
+| GET | `/api/analysis/question/{id}/history` | JWT | Question text, current EaseFactor/Interval, attempts[] ordered ASC |
+
+### 21.3 Data Sources
+- **UserAttempt** (all SessionTypes): aggregate stats, subject breakdowns, per-question history
+- **UserStreak**: CurrentStreak → streakDays (default 0)
+- **UserXp**: TotalXp, CurrentLevel → dashboard (default 0)
+- **QuestionSchedule**: EaseFactor, Interval → question history
+- **Question**: QuestionText, SubjectId/Subject.Name → display
+
+### 21.4 Files Created/Modified (12 total)
+```
+Application/Analysis/Commands/AnalyzeBatch/ (3 files)
+Application/Analysis/Queries/GetDashboard/ (3 files, incl. SubjectAccuracyDto)
+Application/Analysis/Queries/GetQuestionHistory/ (3 files, incl. AttemptDto)
+Api/Controllers/AnalysisController.cs
+tests/.../Analysis/AnalysisTests.cs (12 integration tests)
+
+Modified:
+Application/Common/Interfaces/IAppDbContext.cs  — added UserStreaks, UserXp
+Api/RevisionAI.Api.http                          — added Step 6 (9 entries)
+```
+
+### 21.5 Verification
+```bash
+cd backend && dotnet build  # 0 errors, 0 warnings
+cd backend && dotnet test --filter "Analysis"  # 12 passed, 0 failed
+```
+
+---
+
 ## 20. Phase 2.4 — Spaced Repetition Engine ✅ COMPLETE
 
 ### 20.1 Overview

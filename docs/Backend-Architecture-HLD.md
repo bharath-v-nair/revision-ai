@@ -78,13 +78,15 @@
 
 **Implementation:** `SpacedRepetitionController.cs` with 3 endpoints. SM-2 algorithm in `Infrastructure/Services/Sm2Service.cs`: EaseFactor 1.3–3.0, Interval 1–365 days. DTOs imported from HourlyQuestions (QuestionWithoutAnswersDto) and GetQuestions (MetaDto).
 
-### 1.7 Analysis (Phase 2.5)
+### 1.7 Analysis (Phase 2.5) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| POST | `/api/analysis/batch` | JWT | `{ questionIds: string[] }` | Post-5-question batch analysis |
-| GET | `/api/analysis/dashboard` | JWT | — | Full dashboard metrics |
-| GET | `/api/analysis/question/{id:guid}/history` | JWT | — | Per-question attempt timeline |
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| POST | `/api/analysis/batch` | JWT | `{ questionIds: Guid[] }` | `{ totalQuestions, correctCount, incorrectCount, accuracyPercentage, averageTimeMs }` | Combined stats for specific questions. Validates IDs not empty (400) and all exist (400). |
+| GET | `/api/analysis/dashboard` | JWT | — | `{ totalQuestionsAnswered, totalCorrect, totalIncorrect, overallAccuracy, streakDays, totalXp, currentLevel, weakestSubject, strongestSubject }` | Full dashboard. Stats from all SessionTypes. Streak/XP default 0. Subject accuracy via GroupBy. |
+| GET | `/api/analysis/question/{id:guid}/history` | JWT | — | `{ questionText, currentEaseFactor, currentInterval, attempts: [{ sessionType, selectedOption, isCorrect, timeTakenMs, createdAt }] }` | Per-question attempt timeline ordered ASC. Empty attempts[] if none (not 404). Reads QuestionSchedule for SR state. |
+
+**Implementation:** `AnalysisController.cs` with 3 endpoints injecting `IMediator`. Uses CQRS pattern: `AnalyzeBatchCommandHandler` (validates questionIds + aggregates UserAttempts), `GetDashboardQueryHandler` (reads all SessionTypes, joins Question.Subject for per-subject accuracy, reads UserStreak/UserXp with default 0), `GetQuestionHistoryQueryHandler` (reads Question text + QuestionSchedule + ordered UserAttempts). All queries use `AsNoTracking()` + `.Select()` projection. No new entities or migrations — uses existing `UserAttempt`, `QuestionSchedule`, `UserStreak`, `UserXp`. `ValidationException` thrown for invalid question IDs, caught by middleware → 400. `AttemptDto` and `SubjectAccuracyDto` are self-contained nested DTOs.
 
 ### 1.8 Bookmarks (Phase 2.6)
 

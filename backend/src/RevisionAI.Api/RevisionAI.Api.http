@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:5242
 @email = test@example.com
-@otp = 792822
+@otp = 222340
 
 ### ──────────────── STEP 1: Authenticate ────────────────
 
@@ -188,3 +188,62 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "selectedOption": "A", "timeTakenMs": 10000 }
+
+### ──────────────── STEP 6: Analysis Engine (Phase 2.5) ────────────────
+
+### 6a. Analyze Batch (Endpoint 1)
+# Uses question IDs captured from earlier steps
+POST {{baseUrl}}/api/analysis/batch
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "questionIds": ["{{q1Id}}", "{{q2Id}}", "{{q3Id}}"]
+}
+
+### 6b. Analyze Batch — Empty validation (400)
+POST {{baseUrl}}/api/analysis/batch
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "questionIds": []
+}
+
+### 6c. Analyze Batch — Invalid question ID (400)
+POST {{baseUrl}}/api/analysis/batch
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "questionIds": ["00000000-0000-0000-0000-000000000000"]
+}
+
+### 6d. Get Dashboard (Endpoint 2)
+# Returns overall stats, streak, XP, strongest/weakest subjects
+GET {{baseUrl}}/api/analysis/dashboard
+Authorization: Bearer {{token}}
+
+### 6e. Get Question History (Endpoint 3)
+# Uses questionId from SR review step
+GET {{baseUrl}}/api/analysis/question/{{questionId}}/history
+Authorization: Bearer {{token}}
+
+### 6f. Get Question History — No attempts (returns empty array, not 404)
+# Uses a valid question that the user has never attempted
+GET {{baseUrl}}/api/analysis/question/{{q2Id}}/history
+Authorization: Bearer {{token}}
+
+### 6g. 401 without token
+GET {{baseUrl}}/api/analysis/dashboard
+
+### 6h. 401 — Batch without token
+POST {{baseUrl}}/api/analysis/batch
+Content-Type: application/json
+
+{
+  "questionIds": ["00000000-0000-0000-0000-000000000000"]
+}
+
+### 6i. 401 — Question History without token
+GET {{baseUrl}}/api/analysis/question/00000000-0000-0000-0000-000000000000/history

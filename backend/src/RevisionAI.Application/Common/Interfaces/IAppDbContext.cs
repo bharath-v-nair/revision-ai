@@ -16,6 +16,8 @@ public interface IAppDbContext
     DbSet<QuestionSchedule> QuestionSchedules { get; }
     DbSet<MockSession> MockSessions { get; }
     DbSet<MockSessionAnswer> MockSessionAnswers { get; }
+    DbSet<UserStreak> UserStreaks { get; }
+    DbSet<UserXp> UserXp { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

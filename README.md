@@ -22,7 +22,7 @@
 | 📝 **Custom Mock Engine** | ✅ | Random generation, batch answer, score, retake incorrect. |
 | 🧠 **Spaced Repetition** | ✅ | SM-2 algorithm — daily review cards, due questions, stats. |
 | 🧠 **AI Explanations** | 🔜 | 3-tier (Beginner/Int/Adv) per question |
-| 📊 **Analysis Dashboard** | 🔜 | Accuracy, weak topics, activity charts |
+| 📊 **Analysis Dashboard** | ✅ | Accuracy, weak topics, activity charts |
 | 🎮 **Gamification** | 🔜 | XP, Levels, Streaks, Achievements, Leagues |
 
 ---
@@ -173,6 +173,13 @@ RevisionAI/
 | POST | `/api/spaced-repetition/{id}/review` | JWT | Review with SM-2 algorithm |
 | GET | `/api/spaced-repetition/stats` | JWT | Aggregate SR statistics |
 
+### Analysis Engine (Phase 2.5)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/analysis/batch` | JWT | Combined stats for specific questions |
+| GET | `/api/analysis/dashboard` | JWT | Dashboard with streak, XP, subject accuracy |
+| GET | `/api/analysis/question/{id}/history` | JWT | Per-question attempt timeline |
+
 ---
 
 ## 🧪 Running Tests
@@ -213,7 +220,7 @@ dotnet test --filter "MockEngine"   # Run specific test class
 | 2.2 | Hourly Question Engine | ✅ |
 | 2.3 | Custom Mock Engine | ✅ |
 | 2.4 | Spaced Repetition Engine | ✅ |
-| 2.5 | Analysis Engine | 🔜 |
+| 2.5 | Analysis Engine | ✅ |
 | 2.6 | Bookmarks & Notes | 🔜 |
 | 2.7 | Social (Friends + Leaderboards) | 🔜 |
 | 2.8 | Gamification | 🔜 |
