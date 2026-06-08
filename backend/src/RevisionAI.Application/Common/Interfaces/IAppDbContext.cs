@@ -21,6 +21,8 @@ public interface IAppDbContext
     DbSet<BookmarkCollection> BookmarkCollections { get; }
     DbSet<BookmarkItem> BookmarkItems { get; }
     DbSet<UserNote> UserNotes { get; }
+    DbSet<Friendship> Friendships { get; }
+    DbSet<XpTransaction> XpTransactions { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

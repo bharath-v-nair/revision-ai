@@ -431,3 +431,38 @@ All services follow Clean Architecture: interfaces defined in Application layer,
 ---
 
 *This document will be updated as APIs are built in Phase 2.*
+
+
+## 23. Phase 2.7 — Social Features (Friends & Leaderboards) ✅ COMPLETE
+
+### 23.1 Service Pattern
+FriendsController and LeaderboardsController follow CQRS pattern. Friendship entity pre-exists from Phase 0.2.
+
+### 23.2 Friends — 6 Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/friends/request | Send request by email |
+| GET | /api/friends/requests | Pending incoming requests |
+| POST | /api/friends/requests/{id}/accept | Accept + create reciprocal row |
+| POST | /api/friends/requests/{id}/decline | Decline request |
+| GET | /api/friends | Accepted friends with XP |
+| DELETE | /api/friends/{id} | Unfriend (remove both sides) |
+
+### 23.3 Leaderboards — 4 Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/leaderboards/friends | Friends + self ranked by TotalXp DESC |
+| GET | /api/leaderboards/global | Paginated all users by TotalXp DESC |
+| GET | /api/leaderboards/weekly | Weekly XP from XpTransactions (Mon-Sun UTC) |
+| GET | /api/users/search | Search users by email/name substring |
+
+### 23.4 Files (20 new + 1 modified + 1 test)
+Application/Friends/Commands/SendRequest/, AcceptRequest/, DeclineRequest/, Unfriend/
+Application/Friends/Queries/GetFriendRequests/, GetFriends/
+Application/Friends/Dtos/ (FriendRequestDto, FriendDto)
+Application/Leaderboards/Queries/GetFriendsLeaderboard/, GetGlobalLeaderboard/, GetWeeklyLeaderboard/, SearchUsers/
+Application/Leaderboards/Dtos/ (LeaderboardEntryDto, UserSearchResultDto)
+Api/Controllers/FriendsController.cs, LeaderboardsController.cs
+Application/Common/Interfaces/IAppDbContext.cs (modified)
+tests/.../Social/SocialTests.cs (22 tests)
+tests/.../CustomWebApplicationFactory.cs (modified)

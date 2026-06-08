@@ -1331,3 +1331,53 @@ tests/.../CustomWebApplicationFactory.cs        — DI replacement for note stor
 cd backend && dotnet build                                    # 0 errors, 0 warnings
 cd backend && dotnet test --filter "BookmarksNotesTests"      # 23 passed, 0 failed
 ```
+
+---
+
+## 23. Phase 2.7 — Social Features (Friends & Leaderboards) ✅ COMPLETE
+
+### 23.1 Overview
+Social layer with 10 JWT-secured endpoints across 2 controllers. Friendship management (request/accept/decline/unfriend) and competitive leaderboards (friends/global/weekly). Uses pre-existing Friendship entity from Phase 0.2 — no new migrations.
+
+### 23.2 API Endpoints
+
+**FriendsController (6 endpoints):**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/friends/request | Send request by email. 400 if self/not found. |
+| GET | /api/friends/requests | Pending incoming requests with requester DisplayName+Email |
+| POST | /api/friends/requests/{id}/accept | Accept → status Accepted + reciprocal row created |
+| POST | /api/friends/requests/{id}/decline | Decline → status Declined |
+| GET | /api/friends | Accepted friends with TotalXp, CurrentLevel, FriendsSince |
+| DELETE | /api/friends/{id} | Unfriend — removes BOTH sides of the friendship |
+
+**LeaderboardsController (4 endpoints):**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/leaderboards/friends | Friend IDs (accepted) + self → UserXp by TotalXp DESC, ranked |
+| GET | /api/leaderboards/global | ?page=1&pageSize=50 → all UserXp by TotalXp DESC, paginated |
+| GET | /api/leaderboards/weekly | ?page=1&pageSize=50 → XpTransactions this week (Mon-Sun UTC), grouped by UserId, SUM(Amount), ranked |
+| GET | /api/users/search | ?q=email_or_name → Users where Email/DisplayName contains q, max 20 |
+
+### 23.3 Key Design Decisions
+- **Reciprocal rows:** Friend acceptance creates 2 Accepted rows (A→B and B→A). Each user queries `WHERE RequesterId == me AND Status == "Accepted"` — no OR clauses.
+- **Unfriend:** Finds both (A,B) and (B,A) rows, removes all matching.
+- **Weekly XP:** `(DayOfWeek - Monday + 7) % 7` computes Monday 00:00 UTC. Reads from XpTransactions (source of truth, no cache).
+- **Search:** EF Core `.Contains()` translates to `LIKE '%q%'`. MVP-appropriate for <10K users.
+- **All queries use AsNoTracking() + Select() projection** per established pattern.
+
+### 23.4 Files Created/Modified
+- `Application/Common/Interfaces/IAppDbContext.cs` — added Friendships + XpTransactions DbSets
+- `Application/Friends/` — 4 commands + 2 queries = 12 files + 2 DTOs
+- `Application/Leaderboards/` — 4 queries = 8 files + 2 DTOs
+- `Api/Controllers/FriendsController.cs` — 6 endpoints
+- `Api/Controllers/LeaderboardsController.cs` — 4 endpoints
+- `tests/.../Social/SocialTests.cs` — 22 integration tests
+- `tests/.../CustomWebApplicationFactory.cs` — extended seed data (3 users, XP, friendships)
+
+### 23.5 Verification
+```bash
+cd backend && dotnet build                          # 0 errors, 0 warnings
+cd backend && dotnet test --filter "FullyQualifiedName~Social" # 22 passed
+cd backend && dotnet test                           # 68 total, 0 failed
+```

@@ -193,6 +193,24 @@ RevisionAI/
 | GET | `/api/notes` | JWT | Get notes for question/topic |
 | DELETE | `/api/notes/{id}` | JWT | Delete note |
 
+### Social Features — Friends (Phase 2.7)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/friends/request` | JWT | Send friend request by email |
+| GET | `/api/friends/requests` | JWT | List pending incoming requests |
+| POST | `/api/friends/requests/{id}/accept` | JWT | Accept request (creates reciprocal row) |
+| POST | `/api/friends/requests/{id}/decline` | JWT | Decline request |
+| GET | `/api/friends` | JWT | List accepted friends with XP |
+| DELETE | `/api/friends/{id}` | JWT | Unfriend (removes both sides) |
+
+### Social Features — Leaderboards (Phase 2.7)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/leaderboards/friends` | JWT | Friends + self ranked by TotalXp |
+| GET | `/api/leaderboards/global` | JWT | Global paginated by TotalXp |
+| GET | `/api/leaderboards/weekly` | JWT | Weekly XP earned (Mon-Sun UTC) |
+| GET | `/api/users/search` | JWT | Search users by email/name (max 20) |
+
 ---
 
 ## 🧪 Running Tests
@@ -235,7 +253,7 @@ dotnet test --filter "MockEngine"   # Run specific test class
 | 2.4 | Spaced Repetition Engine | ✅ |
 | 2.5 | Analysis Engine | ✅ |
 | 2.6 | Bookmarks & Notes | ✅ |
-| 2.7 | Social (Friends + Leaderboards) | 🔜 |
+| 2.7 | Social (Friends + Leaderboards) | ✅ |
 | 2.8 | Gamification | 🔜 |
 
 ---

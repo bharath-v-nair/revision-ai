@@ -21,6 +21,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     private readonly string _databaseName = Guid.NewGuid().ToString();
     public Guid TestUserId { get; } = Guid.NewGuid();
     public string TestUserEmail { get; } = "test@integration.tests";
+    public Guid TestUser2Id { get; } = Guid.NewGuid();
+    public string TestUser2Email { get; } = "user2@integration.tests";
+    public Guid TestUser3Id { get; } = Guid.NewGuid();
+    public string TestUser3Email { get; } = "user3@integration.tests";
     public Guid Subject1Id { get; } = Guid.NewGuid();
     public Guid Subject2Id { get; } = Guid.NewGuid();
 
@@ -113,6 +117,51 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
             Email = TestUserEmail,
             DisplayName = "Test User",
             LastLoginAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        dbContext.Users.Add(new User
+        {
+            Id = TestUser2Id,
+            Email = TestUser2Email,
+            DisplayName = "User Two",
+            LastLoginAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        dbContext.Users.Add(new User
+        {
+            Id = TestUser3Id,
+            Email = TestUser3Email,
+            DisplayName = "User Three",
+            LastLoginAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        // XP for ranking/leaderboard tests
+        dbContext.UserXp.Add(new UserXp
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestUserId,
+            TotalXp = 500,
+            CurrentLevel = 3
+        });
+
+        dbContext.UserXp.Add(new UserXp
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestUser2Id,
+            TotalXp = 300,
+            CurrentLevel = 2
+        });
+
+        // Friendships for social tests
+        dbContext.Friendships.Add(new Friendship
+        {
+            Id = Guid.NewGuid(),
+            RequesterId = TestUserId,
+            AddresseeId = TestUser2Id,
+            Status = "Pending",
             CreatedAt = DateTime.UtcNow
         });
 
