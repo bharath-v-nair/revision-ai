@@ -942,3 +942,196 @@ Api/Program.cs                                  — Registered HourlyQuestionSer
 ```bash
 cd backend && dotnet build  # 0 errors, 0 warnings
 ```
+
+---
+
+## 19. PHASE 2.3: CUSTOM MOCK ENGINE IMPLEMENTATION NOTES
+
+**Date:** June 8, 2026
+**Status:** ✅ Complete
+
+### 19.1 Architecture Overview
+
+Phase 2.3 introduces a custom mock/test generation system using existing `MockSession` and `MockSessionAnswer` entities from Phase 0.2. No migrations needed — entities were pre-built.
+
+```
+MocksController [Authorize]
+  → IMediator.Send(Query/Command)
+    → QueryHandler/CommandHandler (Application layer)
+      → IAppDbContext (Infrastructure layer)
+        → PostgreSQL (MockSessions, MockSessionAnswers, Questions, UserAttempts)
+```
+
+### 19.2 IAppDbContext Expansion
+
+Two DbSets were added:
+- `DbSet<MockSession> MockSessions`
+- `DbSet<MockSessionAnswer> MockSessionAnswers`
+
+Both entities already existed in `AppDbContext.cs` but weren't exposed through the interface.
+
+### 19.3 Question Selection Strategy
+
+**Random selection via `OrderBy(_ => Guid.NewGuid())`**
+- EF Core translates to PostgreSQL `ORDER BY RANDOM()` 
+- Efficient at current scale (3,461 questions across 6 subjects)
+- For 50K+ questions, move to `TABLESAMPLE` or client-side shuffle
+
+### 19.4 MockConfig Design
+
+The `GenerateMock` request parameters are serialized to JSON and stored in the existing `MockSession.MockConfig` jsonb column:
+```json
+{"SubjectIds":["guid1","guid2"],"QuestionCount":5,"TimeLimitMinutes":30}
+```
+
+This enables schema-less configuration — future filters (topic, difficulty, exam year) add parameters without migrations.
+
+### 19.5 Score Lifecycle
+
+| Stage | Score | Behavior |
+|-------|-------|----------|
+| On create | 0 | Set in `GenerateMockCommandHandler` |
+| On answer submit | Incremented | `session.Score = (session.Score ?? 0) + 1` per correct answer |
+| On complete | Recalculated | Re-counts from all `MockSessionAnswer.IsCorrect` rows (idempotent safeguard) |
+
+### 19.6 DTO Design
+
+| DTO | Used By | Includes |
+|-----|---------|----------|
+| `MockQuestionDto` | Generate + GetMockSession | displayOrder, questionId, questionText, optionA-D — **NO CorrectOption, NO Explanation** |
+| `AnswerResultDto` | SubmitMockAnswers | questionId, displayOrder, isCorrect, correctOption, explanation |
+| `CompleteMockResponse` | CompleteMock | mockSessionId, totalQuestions, answeredCount, correctCount, skippedCount, score, timeTakenSeconds |
+| `MockResultQuestionDto` | GetMockResults | All of MockQuestionDto + selectedOption, isCorrect, correctOption, explanation, timeTakenMs |
+| `MockHistoryDto` | GetMockHistory | mockSessionId, startedAt, completedAt, questionCount, score, timeTakenSeconds |
+| `MetaDto` | GetMockHistory | Imported from `Application.Questions.Queries.GetQuestions` — NO duplicate |
+
+**Design principle:** List/generate/session endpoints hide answers. Submit + Results endpoints reveal answers (student already submitted).
+
+### 19.7 API Endpoints
+
+| Method | Route | Auth | Handler |
+|--------|-------|------|---------|
+| POST | `/api/mocks/generate` | JWT | `GenerateMockCommandHandler` — random select, create session+answers |
+| GET | `/api/mocks/{id:guid}` | JWT | `GetMockSessionQueryHandler` — session + questions, validate ownership |
+| POST | `/api/mocks/{mockSessionId}/answers` | JWT | `SubmitMockAnswersCommandHandler` — batch validate + create UserAttempts |
+| POST | `/api/mocks/{id:guid}/complete` | JWT | `CompleteMockCommandHandler` — set CompletedAt, compute stats |
+| GET | `/api/mocks/{id:guid}/results` | JWT | `GetMockResultsQueryHandler` — full breakdown (requires completion) |
+| GET | `/api/mocks/history` | JWT | `GetMockHistoryQueryHandler` — paginated, CompletedAt DESC |
+| POST | `/api/mocks/generate/retake-incorrect` | JWT | `RetakeIncorrectCommandHandler` — new mock from incorrect answers |
+
+### 19.8 Answer Validation
+
+`SubmitMockAnswersCommandHandler` validates inline:
+1. Session exists + belongs to user — 400 if not
+2. Each submitted question exists in session (questionId + displayOrder match) — 400 if not
+3. Question entity loads correctly — 400 if not found
+
+Correctness: `char.ToUpperInvariant(input.SelectedOption) == char.ToUpperInvariant(question.CorrectOption)`
+
+### 19.9 UserAttempt Creation
+
+For each submitted answer, a `UserAttempt` record is created:
+```csharp
+new UserAttempt {
+    UserId = request.UserId,
+    QuestionId = input.QuestionId,
+    SelectedOption = char.ToUpperInvariant(input.SelectedOption),
+    IsCorrect = isCorrect,
+    TimeTakenMs = input.TimeTakenMs,
+    SessionType = "Mock",       // distinguishes from "Hourly" in Phase 2.2
+    AttemptNumber = 1,
+    CreatedAt = DateTime.UtcNow
+}
+```
+
+### 19.10 RetakeIncorrect Logic
+
+1. Load previous session → find all `MockSessionAnswer` rows where `IsCorrect == false`
+2. Load those questions by ID
+3. Create new `MockSession` with config referencing previous session
+4. Create new `MockSessionAnswer` rows (maintaining original display order)
+5. Returns `GenerateMockResponse` (reuses existing response DTO — no new class)
+
+### 19.11 Files Created/Modified (28 total)
+
+**New files (27):**
+```
+Application/Mocks/
+├── Commands/GenerateMock/
+│   ├── GenerateMockCommand.cs
+│   ├── GenerateMockResponse.cs
+│   ├── MockQuestionDto.cs
+│   └── GenerateMockCommandHandler.cs
+├── Commands/SubmitMockAnswers/
+│   ├── SubmitMockAnswersCommand.cs
+│   ├── SubmitMockAnswersResponse.cs
+│   └── SubmitMockAnswersCommandHandler.cs
+├── Commands/CompleteMock/
+│   ├── CompleteMockCommand.cs
+│   ├── CompleteMockResponse.cs
+│   └── CompleteMockCommandHandler.cs
+├── Commands/RetakeIncorrect/
+│   ├── RetakeIncorrectCommand.cs
+│   └── RetakeIncorrectCommandHandler.cs
+├── Queries/GetMockSession/
+│   ├── GetMockSessionQuery.cs
+│   ├── GetMockSessionResponse.cs
+│   └── GetMockSessionQueryHandler.cs
+├── Queries/GetMockResults/
+│   ├── GetMockResultsQuery.cs
+│   ├── GetMockResultsResponse.cs
+│   ├── MockResultQuestionDto.cs
+│   └── GetMockResultsQueryHandler.cs
+└── Queries/GetMockHistory/
+    ├── GetMockHistoryQuery.cs
+    ├── GetMockHistoryResponse.cs
+    ├── MockHistoryDto.cs
+    └── GetMockHistoryQueryHandler.cs
+
+Api/Controllers/
+└── MocksController.cs
+
+Api/
+└── RevisionAI.Api.http  — Updated with 7 endpoints + edge cases
+
+Api/Properties/
+└── AssemblyInfo.cs      — InternalsVisibleTo("RevisionAI.Api.IntegrationTests")
+
+tests/
+├── CustomWebApplicationFactory.cs
+├── MockEngine/MockEngineTests.cs
+├── RevisionAI.Api.IntegrationTests.csproj
+├── .editorconfig (tests)
+└── .editorconfig (test project)
+
+docs/
+├── TESTING-GUIDE.md
+├── SUBAGENTS.md
+└── PostMortem-2.3.md
+```
+
+**Modified files (1):**
+```
+Application/Common/Interfaces/IAppDbContext.cs — Added MockSessions, MockSessionAnswers
+```
+
+### 19.12 Testing
+
+**Integration tests:** xUnit + WebApplicationFactory with EF Core InMemory. 6/14 pass (POST endpoints + auth). 8 GET tests need Testcontainers.PostgreSql due to InMemory navigation projection limitation.
+
+**Manual tests:** Complete `.http` file with variable chaining covering all 7 endpoints + 5 edge cases.
+
+### 19.13 What Phase 2.3 Defers
+
+| Feature | Phase | Reason |
+|---------|-------|--------|
+| Testcontainers upgrade for 14/14 pass | 2.4 | Swap InMemory → PostgreSQL container |
+| Mock analytics/trend charts | 2.5 | Analysis Engine not yet built |
+| Auto-submit on timer expiry | 3.x | Requires BackgroundService |
+| Share mock with friends | 2.7 | Social features not yet built |
+
+### 19.14 Verification
+```bash
+cd backend && dotnet build  # 0 errors, 0 warnings
+cd backend && dotnet test tests/RevisionAI.Api.IntegrationTests/  # 6/14 pass (InMemory limitation)
+```

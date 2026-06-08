@@ -1,6 +1,121 @@
-@RevisionAI.Api_HostAddress = http://localhost:5242
+@baseUrl = http://localhost:5242
+@email = test@example.com
+@otp = 123456
 
-GET {{RevisionAI.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### ──────────────── STEP 1: Authenticate ────────────────
 
-###
+### 1a. Send OTP (check console for [DEV OTP] output)
+POST {{baseUrl}}/api/auth/email/send-otp
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+### 1b. Verify OTP — captures accessToken into @token variable
+# @name verify
+POST {{baseUrl}}/api/auth/email/verify-otp
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "{{otp}}" }
+
+@token = {{verify.response.body.accessToken}}
+
+### ──────────────── STEP 2: Get Subject IDs ────────────────
+
+### 2a. List subjects
+# @name subjects
+GET {{baseUrl}}/api/subjects
+Authorization: Bearer {{token}}
+
+@subject1Id = {{subjects.response.body.data[0].id}}
+@subject2Id = {{subjects.response.body.data[1].id}}
+
+### ──────────────── STEP 3: Mock Engine Endpoints ────────────────
+
+### 3a. Generate Mock (Endpoint 1)
+# Generates a mock with 5 random questions from 2 subjects
+# @name generate
+POST {{baseUrl}}/api/mocks/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subjectIds": ["{{subject1Id}}", "{{subject2Id}}"],
+  "questionCount": 5,
+  "timeLimitMinutes": 30
+}
+
+@mockId = {{generate.response.body.mockSessionId}}
+@q1Id = {{generate.response.body.questions[0].questionId}}
+@q2Id = {{generate.response.body.questions[1].questionId}}
+@q3Id = {{generate.response.body.questions[2].questionId}}
+
+### 3b. Get Mock Session (Endpoint 2)
+GET {{baseUrl}}/api/mocks/{{mockId}}
+Authorization: Bearer {{token}}
+
+### 3c. Submit Answers (Endpoint 3)
+# Answer 3 questions — options chosen arbitrarily for testing
+POST {{baseUrl}}/api/mocks/{{mockId}}/answers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "answers": [
+    { "questionId": "{{q1Id}}", "displayOrder": 1, "selectedOption": "A", "timeTakenMs": 30000 },
+    { "questionId": "{{q2Id}}", "displayOrder": 2, "selectedOption": "B", "timeTakenMs": 45000 },
+    { "questionId": "{{q3Id}}", "displayOrder": 3, "selectedOption": "C", "timeTakenMs": 25000 }
+  ]
+}
+
+### 3d. Complete Mock (Endpoint 4)
+POST {{baseUrl}}/api/mocks/{{mockId}}/complete
+Authorization: Bearer {{token}}
+
+### 3e. Get Results (Endpoint 5)
+# Only accessible after completion
+GET {{baseUrl}}/api/mocks/{{mockId}}/results
+Authorization: Bearer {{token}}
+
+### 3f. Get History (Endpoint 6)
+GET {{baseUrl}}/api/mocks/history?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### 3g. Retake Incorrect (Endpoint 7)
+# Creates a new mock with only questions answered incorrectly
+POST {{baseUrl}}/api/mocks/generate/retake-incorrect
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "previousMockSessionId": "{{mockId}}"
+}
+
+### ──────────────── STEP 4: Edge Case Tests ────────────────
+
+### 4a. 401 without token
+POST {{baseUrl}}/api/mocks/generate
+Content-Type: application/json
+
+{ "subjectIds": ["00000000-0000-0000-0000-000000000000"], "questionCount": 5 }
+
+### 4b. 400 validation — no subjects
+POST {{baseUrl}}/api/mocks/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "subjectIds": [], "questionCount": 5 }
+
+### 4c. 400 validation — zero question count
+POST {{baseUrl}}/api/mocks/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "subjectIds": ["{{subject1Id}}"], "questionCount": 0 }
+
+### 4d. 400 — complete an already completed mock
+POST {{baseUrl}}/api/mocks/{{mockId}}/complete
+Authorization: Bearer {{token}}
+
+### 4e. 404 — non-existent mock session
+GET {{baseUrl}}/api/mocks/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}

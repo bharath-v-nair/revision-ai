@@ -38,23 +38,35 @@
 
 **Implementation:** `SubjectsController.cs` with 2 endpoints injecting `IMediator`. Uses CQRS pattern: `GetSubjectsQuery` (returns all subjects with question counts via `s.Questions.Count`), `GetSubjectChaptersQuery` (finds subject by slug, returns null for 404, returns chapters with question counts). All queries use `AsNoTracking()`. SubjectSlug matching is direct comparison (slugs stored lowercase in DB).
 
-### 1.4 Hourly Questions (Phase 2.2)
+### 1.4 Hourly Questions (Phase 2.2) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| GET | `/api/hourly-questions` | JWT | — | Current pending questions |
-| POST | `/api/hourly-questions/{id:guid}/answer` | JWT | `{ selectedOption: char }` | Submit answer |
-| GET | `/api/hourly-questions/history` | JWT | `?page=1&pageSize=50` | Past answered/expired questions |
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| GET | `/api/hourly-questions` | JWT | — | `{ data: [{ pendingQuestionId, expiresAt, question: QuestionWithoutAnswersDto }] }` | Unanswered, unexpired pending questions ordered by CreatedAt ASC (oldest first). Hides CorrectOption + Explanation. |
+| POST | `/api/hourly-questions/{id:guid}/answer` | JWT | `{ selectedOption: "B" }` | `{ isCorrect, correctOption, explanation }` | Submit answer. Validates ownership, not expired, not already answered. Creates UserAttempt (SessionType="Hourly"). Returns correctness + answer. |
+| GET | `/api/hourly-questions/history` | JWT | `?page=1&pageSize=20` | `{ data: [{ pendingQuestionId, expiresAt, isAnswered, answeredAt, userAnswer, question }], meta }` | Paginated history of answered + expired questions. Ordered by CreatedAt DESC. Hides CorrectOption + Explanation from embedded question. |
 
-### 1.5 Mocks (Phase 2.3)
+**Scheduler:** `HourlyQuestionService` (BackgroundService) — runs every hour on the hour via `PeriodicTimer`. Delivers 2 uniform random questions to all users with `LastLoginAt` within 7 days. 48-question queue cap per user. 24-hour expiry. Excludes already-attempted and already-pending questions. Uses `IServiceScopeFactory` to create scoped `IAppDbContext`.
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| POST | `/api/mocks/generate` | JWT | `{ subjectIds[], topicIds[], questionCount, weightages?, difficulty? }` | Generate mock quiz |
-| GET | `/api/mocks/{id:guid}` | JWT | — | Get mock session (no answers) |
-| POST | `/api/mocks/{id:guid}/submit` | JWT | `{ answers: [{ questionId, selectedOption, timeTakenMs }] }` | Submit mock answers |
-| GET | `/api/mocks/{id:guid}/results` | JWT | — | Mock results with per-question breakdown |
-| GET | `/api/mocks/history` | JWT | `?page=1&pageSize=20` | Past mock sessions |
+**Implementation:** `HourlyQuestionsController.cs` with 3 endpoints injecting `IMediator`. Uses CQRS pattern: `GetPendingQuestionsQuery` (filters by UserId, IsAnswered=false, ExpiresAt>now), `AnswerQuestionCommand` (validates ownership/expiry/not-answered inline, creates UserAttempt), `GetHourlyHistoryQuery` (joined with UserAttempts on (UserId, QuestionId, SessionType="Hourly")). All queries use `AsNoTracking()` + `.Select()` projection. QuestionWithoutAnswersDto excludes CorrectOption + Explanation. AnswerQuestionResponse includes both. `User.LastLoginAt` added to domain — set on Google OAuth + Email OTP login. Migration: `20260607020510_AddUserLastLoginAt`.
+
+**DTOs:** `PendingQuestionDto` (pendingQuestionId, expiresAt, QuestionWithoutAnswersDto), `QuestionWithoutAnswersDto` (all question fields EXCEPT CorrectOption, Explanation), `AnswerQuestionResponse` (isCorrect, correctOption, explanation), `HourlyHistoryDto` (pendingQuestionId, expiresAt, isAnswered, answeredAt, userAnswer, QuestionWithoutAnswersDto), `MetaDto` (page, pageSize, totalCount, hasNext — shared with GetQuestions namespace).
+
+### 1.5 Mocks (Phase 2.3) ✅ COMPLETE
+
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| POST | `/api/mocks/generate` | JWT | `{ subjectIds: Guid[], questionCount: int, timeLimitMinutes?: int }` | `{ mockSessionId, totalQuestions, timeLimitMinutes, questions: MockQuestionDto[] }` | Random selection from subjects, creates session + answers. Questions hide CorrectOption + Explanation. |
+| GET | `/api/mocks/{id:guid}` | JWT | — | `{ mockSessionId, config, totalQuestions, timeLimitMinutes, startedAt, isCompleted, score, questions: MockQuestionDto[] }` | Session view. Validates ownership (404 if not owner). Questions hide answers. |
+| POST | `/api/mocks/{mockSessionId:guid}/answers` | JWT | `{ answers: [{ questionId, displayOrder, selectedOption: char, timeTakenMs }] }` | `{ results: [{ questionId, displayOrder, isCorrect, correctOption, explanation }] }` | Batch validate + check correctness + create UserAttempts (SessionType="Mock"). Increments score. Reveals answers. |
+| POST | `/api/mocks/{id:guid}/complete` | JWT | — | `{ mockSessionId, totalQuestions, answeredCount, correctCount, skippedCount, score, timeTakenSeconds }` | Finalize session, compute stats. Unanswered rows = skipped. |
+| GET | `/api/mocks/{id:guid}/results` | JWT | — | `{ mockSessionId, totalQuestions, correctCount, incorrectCount, skippedCount, score, timeTakenSeconds, questions: MockResultQuestionDto[] }` | Full breakdown with student + correct answers. Only after completion (400 if not). |
+| GET | `/api/mocks/history` | JWT | `?page=1&pageSize=20` | `{ data: MockHistoryDto[], meta: { page, pageSize, totalCount, hasNext } }` | Paginated completed sessions. Ordered by CompletedAt DESC. |
+| POST | `/api/mocks/generate/retake-incorrect` | JWT | `{ previousMockSessionId: Guid }` | `{ mockSessionId, totalQuestions, questions: MockQuestionDto[] }` | New mock from previous session's incorrect answers (IsCorrect==false). |
+
+**Implementation:** `MocksController.cs` with 7 endpoints injecting `IMediator`. Uses CQRS pattern: `GenerateMockCommandHandler` (random selection via `OrderBy(_ => Guid.NewGuid())`, creates MockSession + MockSessionAnswer rows), `GetMockSessionQueryHandler` (validate ownership, return null for 404), `SubmitMockAnswersCommandHandler` (inline validation, char.ToUpperInvariant comparison, batch UserAttempt creation, score increment), `CompleteMockCommandHandler` (set CompletedAt, recount stats), `GetMockResultsQueryHandler` (requires completion, returns full breakdown), `GetMockHistoryQueryHandler` (paginated, CompletedAt DESC, imports MetaDto from GetQuestions), `RetakeIncorrectCommandHandler` (finds IsCorrect==false rows, creates new session). No migrations needed — `MockSession` and `MockSessionAnswer` entities from Phase 0.2. `MockConfig` stored as JSON string in jsonb column. Score initialized to 0, incremented on submit, recalculated on complete for idempotency.
+
+**DTOs:** `MockQuestionDto` (displayOrder, questionId, questionText, optionA-D — no answers), `AnswerResultDto` (questionId, displayOrder, isCorrect, correctOption, explanation), `CompleteMockResponse` (stats), `MockResultQuestionDto` (full breakdown with student answer), `MockHistoryDto` (summary). `MetaDto` imported from `Application.Questions.Queries.GetQuestions`.
 
 ### 1.6 Reviews / Spaced Repetition (Phase 2.4)
 
@@ -372,21 +384,36 @@ All services follow Clean Architecture: interfaces defined in Application layer,
 
 ## 10. PHASE STATUS
 
+### Phase 2.1 (Questions API): ✅ Complete
+- 5 API endpoints (subjects list, chapters, questions list + detail + media)
+- 22 files across Application and Api layers
+- Pagination, filtering, answer hiding, 404 patterns
+
+### Phase 2.2 (Hourly Question Engine): ✅ Complete
+- 3 API endpoints + 1 BackgroundService (HourlyQuestionService)
+- 19 new files, LastLoginAt migration
+- Uniform question delivery, 48 queue cap, 24hr expiry
+
+### Phase 2.3 (Custom Mock Engine): ✅ Complete
+- 7 API endpoints, 27 new files, 1 modified (IAppDbContext)
+- Random question selection, batch answer submission, score lifecycle
+- MockConfig as JSONB, DTO reuse, UserAttempt integration
+- 6/14 xUnit integration tests passing (InMemory limitation)
+
 ### Phase 0.1 (Project Scaffold): ✅ Complete
-- .NET 10 solution with 5 Clean Architecture projects created
-- NuGet packages: MediatR 14.1, EF Core 10, Npgsql, BCrypt, Serilog, Swagger, JWT Bearer, Azure Blob
-- `dotnet build` succeeds with 0 errors, 0 warnings
+- .NET 10 solution with 5 Clean Architecture projects
+- NuGet packages: MediatR, EF Core, Npgsql, Serilog, Swagger
+- 0 build errors, 0 warnings
 
 ### Phase 0.2 (Database Schema): ✅ Complete
 - 20 entities, 20 Fluent API configurations, InitialCreate migration
 - 21 tables, 60+ indexes, 40+ foreign keys
-- 19 medical subjects seeded
+- 19 medical subjects seeded (6 seeded with data)
 
 ### Phase 0.3 (Authentication): ✅ Complete
 - 5 auth endpoints, 4 MediatR commands/handlers
 - JWT Bearer middleware, Google OAuth, Email OTP
-- 26 new files across Contracts, Application, Infrastructure, and Api layers
-- Verified: send-otp (200), verify-otp (200), refresh (200), validation errors (400)
+- Verified: send-otp, verify-otp, refresh, logout
 
 ---
 

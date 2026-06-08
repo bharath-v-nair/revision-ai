@@ -69,7 +69,24 @@ AGENTS.md
 docs/DOCUMENTATION_STRATEGY.md
 docs/Interview.md
 docs/PostMortem-*.md
+SUBJECT_TRACKER.md
+docs/SUBAGENTS.md
+docs/TESTING-GUIDE.md
 
+# ===== Pipeline Temp Files (Not for GitHub) =====
+temp_*.png
+local_temp/
+draft_*.json
+extract_*.py
+extract.py
+builder.py
+build_json.py
+test_text.py
+extract_chapter_10.py
+assets/
+temp_pages/
+builder.py
+SUBJECT_TRACKER.md
 # ===== Auto-generated =====
 frontend/README.md
 
