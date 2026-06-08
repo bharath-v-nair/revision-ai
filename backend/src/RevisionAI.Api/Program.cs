@@ -106,6 +106,9 @@ static async Task RunApiServer(string[] cliArgs)
     // Background Services
     builder.Services.AddHostedService<HourlyQuestionService>();
 
+    // Spaced Repetition SM-2 Service
+    builder.Services.AddSingleton<ISm2Service, Sm2Service>();
+
     // Authentication — JWT Bearer
     string? jwtKey = builder.Configuration["Jwt:Key"];
     string? jwtIssuer = builder.Configuration["Jwt:Issuer"];

@@ -13,6 +13,7 @@ public interface IAppDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<UserAttempt> UserAttempts { get; }
     DbSet<PendingQuestion> PendingQuestions { get; }
+    DbSet<QuestionSchedule> QuestionSchedules { get; }
     DbSet<MockSession> MockSessions { get; }
     DbSet<MockSessionAnswer> MockSessionAnswers { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;

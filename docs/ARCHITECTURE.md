@@ -1135,3 +1135,97 @@ Application/Common/Interfaces/IAppDbContext.cs — Added MockSessions, MockSessi
 cd backend && dotnet build  # 0 errors, 0 warnings
 cd backend && dotnet test tests/RevisionAI.Api.IntegrationTests/  # 6/14 pass (InMemory limitation)
 ```
+
+### 19.15 Files Created
+```
+Application/Mocks/Commands/GenerateMock/ (4 files)
+Application/Mocks/Commands/SubmitMockAnswers/ (3 files)
+Application/Mocks/Commands/CompleteMock/ (3 files)
+Application/Mocks/Commands/RetakeIncorrect/ (2 files)
+Application/Mocks/Queries/GetMockSession/ (3 files)
+Application/Mocks/Queries/GetMockResults/ (4 files)
+Application/Mocks/Queries/GetMockHistory/ (4 files)
+Api/Controllers/MocksController.cs
+Api/RevisionAI.Api.http  (updated)
+```
+
+---
+
+## 20. Phase 2.4 — Spaced Repetition Engine ✅ COMPLETE
+
+### 20.1 Overview
+Spaced repetition system using the SM-2 algorithm. Questions are scheduled for review at optimal intervals based on correctness history. Uses existing `QuestionSchedule` and `UserAttempt` entities from Phase 0.2 — no new migrations.
+
+### 20.2 API Endpoints (3 endpoints)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/spaced-repetition/due` | JWT | Paginated due questions ordered by NextReviewDate ASC. Hides CorrectOption + Explanation. |
+| POST | `/api/spaced-repetition/{id}/review` | JWT | Review question via SM-2. Creates/updates QuestionSchedule + UserAttempt. Reveals answer. |
+| GET | `/api/spaced-repetition/stats` | JWT | Aggregate stats: totalScheduled, dueToday, averageEaseFactor, totalReviews |
+
+### 20.3 SM-2 Algorithm
+- **Interface:** `ISm2Service` (Application layer)
+- **Implementation:** `Sm2Service.cs` (Infrastructure layer)
+- **Parameters:** EaseFactor 1.3–3.0, Interval 1–365 days
+- **Schedule:** First review = 1 day, second = 6 days, after = ceil(interval × easeFactor)
+- **Correct:** Repetitions++, EaseFactor += 0.1 (cap 3.0), Interval *= EaseFactor (cap 365)
+- **Incorrect:** Repetitions = 0, EaseFactor = max(1.3, current - 0.2), Interval = 1
+
+### 20.4 Architecture Patterns
+- **CQRS:** `GetDueQuestionsQuery` → `GetDueQuestionsQueryHandler` (AsNoTracking + Select projection)
+- **CQRS:** `ReviewQuestionCommand` → `ReviewQuestionCommandHandler` (load-then-save upsert pattern)
+- **CQRS:** `GetSpacedRepetitionStatsQuery` → 4 aggregate queries (CountAsync + AverageAsync)
+- **DTO reuse:** `QuestionWithoutAnswersDto` imported from HourlyQuestions, `MetaDto` from GetQuestions
+- **Auth:** UserId extracted from `ClaimTypes.NameIdentifier` in controller
+
+### 20.5 Data Flow: Review Question
+```
+POST /api/spaced-repetition/{id}/review { selectedOption: 'A', timeTakenMs: 15000 }
+  → SpacedRepetitionController.ReviewQuestion()
+    → ReviewQuestionCommandHandler.Handle()
+      → _context.Questions.AsNoTracking().FirstOrDefaultAsync(id)  // validate exists
+      → isCorrect = selectedOption == question.CorrectOption
+      → _context.QuestionSchedules.FirstOrDefaultAsync(userId, questionId)  // find or null
+      → _sm2Service.Calculate(isCorrect, currentEaseFactor, currentInterval, currentRepetitions)
+      → Create/update QuestionSchedule row
+      → Create UserAttempt (SessionType="SpacedRepetition")
+      → _context.SaveChangesAsync()
+      → return { isCorrect, correctOption, explanation, newEaseFactor, newInterval, nextReviewDate }
+```
+
+### 20.6 Files Created/Modified (16 total)
+**New files (14):**
+```
+Application/Common/Interfaces/
+└── ISm2Service.cs
+
+Infrastructure/Services/
+└── Sm2Service.cs
+
+Application/SpacedRepetition/
+├── Queries/GetDueQuestions/
+│   ├── GetDueQuestionsQuery.cs
+│   ├── GetDueQuestionsResponse.cs
+│   └── GetDueQuestionsQueryHandler.cs
+├── Commands/ReviewQuestion/
+│   ├── ReviewQuestionCommand.cs
+│   ├── ReviewQuestionResponse.cs
+│   └── ReviewQuestionCommandHandler.cs
+└── Queries/GetSpacedRepetitionStats/
+    ├── GetSpacedRepetitionStatsQuery.cs
+    ├── GetSpacedRepetitionStatsResponse.cs
+    └── GetSpacedRepetitionStatsQueryHandler.cs
+
+Api/Controllers/
+└── SpacedRepetitionController.cs
+
+tests/.../SpacedRepetition/
+└── SpacedRepetitionTests.cs
+```
+
+**Modified files (3):**
+```
+Api/Program.cs                          — registered ISm2Service as Sm2Service singleton
+Application/Common/Interfaces/IAppDbContext.cs  — added QuestionSchedules DbSet
+Api/RevisionAI.Api.http                 — added Step 5 (8 SR test cases)
+```

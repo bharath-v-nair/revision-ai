@@ -68,12 +68,15 @@
 
 **DTOs:** `MockQuestionDto` (displayOrder, questionId, questionText, optionA-D — no answers), `AnswerResultDto` (questionId, displayOrder, isCorrect, correctOption, explanation), `CompleteMockResponse` (stats), `MockResultQuestionDto` (full breakdown with student answer), `MockHistoryDto` (summary). `MetaDto` imported from `Application.Questions.Queries.GetQuestions`.
 
-### 1.6 Reviews / Spaced Repetition (Phase 2.4)
+### 1.6 Reviews / Spaced Repetition (Phase 2.4) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Params | Description |
-|--------|----------|------|--------|-------------|
-| GET | `/api/reviews/due` | JWT | `?count=10` | Questions due for SR review |
-| GET | `/api/reviews/stats` | JWT | — | SM-2 statistics |
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| GET | `/api/spaced-repetition/due` | JWT | `?page=1&pageSize=20` | `{ data: [DueQuestionDto], meta: { page, pageSize, totalCount, hasNext } }` | Paginated due questions ordered by NextReviewDate ASC. Question DTO hides CorrectOption + Explanation. |
+| POST | `/api/spaced-repetition/{questionId}/review` | JWT | `{ selectedOption: char, timeTakenMs: int }` | `{ isCorrect, correctOption, explanation, newEaseFactor, newInterval, nextReviewDate }` | Review via SM-2 algorithm. Creates/updates QuestionSchedule + UserAttempt (SessionType="SpacedRepetition"). Reveals answer after submission. |
+| GET | `/api/spaced-repetition/stats` | JWT | — | `{ totalScheduled, dueToday, averageEaseFactor, totalReviews }` | Aggregate SR statistics for current user. |
+
+**Implementation:** `SpacedRepetitionController.cs` with 3 endpoints. SM-2 algorithm in `Infrastructure/Services/Sm2Service.cs`: EaseFactor 1.3–3.0, Interval 1–365 days. DTOs imported from HourlyQuestions (QuestionWithoutAnswersDto) and GetQuestions (MetaDto).
 
 ### 1.7 Analysis (Phase 2.5)
 

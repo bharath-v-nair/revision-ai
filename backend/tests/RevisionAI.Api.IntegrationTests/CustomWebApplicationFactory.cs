@@ -38,7 +38,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         });
     }
 
-    private static void RemoveDbContextRegistrations(IServiceCollection services)
+    private void RemoveDbContextRegistrations(IServiceCollection services)
     {
         // Collect all descriptors related to AppDbContext
         ServiceDescriptor[] toRemove = services
@@ -52,7 +52,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
         // Register InMemory replacements
         services.AddDbContext<AppDbContext>(options =>
-            options.UseInMemoryDatabase("test-" + Guid.NewGuid().ToString("N")));
+            options.UseInMemoryDatabase(_databaseName));
 
         services.AddScoped<IAppDbContext>(sp =>
             sp.GetRequiredService<AppDbContext>());

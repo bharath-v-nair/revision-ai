@@ -20,6 +20,7 @@
 | 🔍 **Browse & Search** | ✅ | Filter by subject, chapter. Paginated. |
 | ⏰ **Hourly Question Engine** | ✅ | 2 Q/hr, 24hr expiry, 48 queue cap. BackgroundService. |
 | 📝 **Custom Mock Engine** | ✅ | Random generation, batch answer, score, retake incorrect. |
+| 🧠 **Spaced Repetition** | ✅ | SM-2 algorithm — daily review cards, due questions, stats. |
 | 🧠 **AI Explanations** | 🔜 | 3-tier (Beginner/Int/Adv) per question |
 | 📊 **Analysis Dashboard** | 🔜 | Accuracy, weak topics, activity charts |
 | 🎮 **Gamification** | 🔜 | XP, Levels, Streaks, Achievements, Leagues |
@@ -165,6 +166,13 @@ RevisionAI/
 | GET | `/api/mocks/history` | JWT | Paginated history |
 | POST | `/api/mocks/generate/retake-incorrect` | JWT | Retake wrong answers |
 
+### Spaced Repetition (Phase 2.4)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/spaced-repetition/due` | JWT | Paginated due questions (answers hidden) |
+| POST | `/api/spaced-repetition/{id}/review` | JWT | Review with SM-2 algorithm |
+| GET | `/api/spaced-repetition/stats` | JWT | Aggregate SR statistics |
+
 ---
 
 ## 🧪 Running Tests
@@ -204,7 +212,7 @@ dotnet test --filter "MockEngine"   # Run specific test class
 | 2.1 | Questions API | ✅ |
 | 2.2 | Hourly Question Engine | ✅ |
 | 2.3 | Custom Mock Engine | ✅ |
-| 2.4 | Spaced Repetition Engine | 🔜 |
+| 2.4 | Spaced Repetition Engine | ✅ |
 | 2.5 | Analysis Engine | 🔜 |
 | 2.6 | Bookmarks & Notes | 🔜 |
 | 2.7 | Social (Friends + Leaderboards) | 🔜 |
