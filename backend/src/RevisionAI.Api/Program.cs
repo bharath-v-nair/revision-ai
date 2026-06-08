@@ -92,6 +92,10 @@ static async Task RunApiServer(string[] cliArgs)
     // FluentValidation
     builder.Services.AddValidatorsFromAssemblyContaining<GoogleLoginRequestValidator>();
 
+    // Note Storage Service (dev: local file system)
+    builder.Services.AddSingleton<INoteStorageService>(
+        sp => new LocalNoteStorageService(builder.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")));
+
     // Infrastructure Services
     builder.Services.AddSingleton<JwtTokenService>();
     builder.Services.AddSingleton<IJwtTokenService>(sp => sp.GetRequiredService<JwtTokenService>());

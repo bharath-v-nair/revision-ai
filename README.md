@@ -23,6 +23,7 @@
 | 🧠 **Spaced Repetition** | ✅ | SM-2 algorithm — daily review cards, due questions, stats. |
 | 🧠 **AI Explanations** | 🔜 | 3-tier (Beginner/Int/Adv) per question |
 | 📊 **Analysis Dashboard** | ✅ | Accuracy, weak topics, activity charts |
+| 🔖 **Bookmarks & Notes** | ✅ | Save questions to collections, upload handwritten notes |
 | 🎮 **Gamification** | 🔜 | XP, Levels, Streaks, Achievements, Leagues |
 
 ---
@@ -180,6 +181,18 @@ RevisionAI/
 | GET | `/api/analysis/dashboard` | JWT | Dashboard with streak, XP, subject accuracy |
 | GET | `/api/analysis/question/{id}/history` | JWT | Per-question attempt timeline |
 
+### Bookmarks & Notes (Phase 2.6)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/bookmarks/collections` | JWT | Create bookmark collection |
+| GET | `/api/bookmarks/collections` | JWT | List user's collections with item counts |
+| POST | `/api/bookmarks/collections/{id}/items` | JWT | Add question to collection |
+| DELETE | `/api/bookmarks/collections/{id}/items/{qid}` | JWT | Remove question from collection |
+| GET | `/api/bookmarks/collections/{id}/items` | JWT | Paginated questions (answers hidden) |
+| POST | `/api/notes` | JWT | Upload note (PNG/JPEG/WebP, max 10MB) |
+| GET | `/api/notes` | JWT | Get notes for question/topic |
+| DELETE | `/api/notes/{id}` | JWT | Delete note |
+
 ---
 
 ## 🧪 Running Tests
@@ -221,7 +234,7 @@ dotnet test --filter "MockEngine"   # Run specific test class
 | 2.3 | Custom Mock Engine | ✅ |
 | 2.4 | Spaced Repetition Engine | ✅ |
 | 2.5 | Analysis Engine | ✅ |
-| 2.6 | Bookmarks & Notes | 🔜 |
+| 2.6 | Bookmarks & Notes | ✅ |
 | 2.7 | Social (Friends + Leaderboards) | 🔜 |
 | 2.8 | Gamification | 🔜 |
 

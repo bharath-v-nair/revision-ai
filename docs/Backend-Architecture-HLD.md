@@ -88,23 +88,31 @@
 
 **Implementation:** `AnalysisController.cs` with 3 endpoints injecting `IMediator`. Uses CQRS pattern: `AnalyzeBatchCommandHandler` (validates questionIds + aggregates UserAttempts), `GetDashboardQueryHandler` (reads all SessionTypes, joins Question.Subject for per-subject accuracy, reads UserStreak/UserXp with default 0), `GetQuestionHistoryQueryHandler` (reads Question text + QuestionSchedule + ordered UserAttempts). All queries use `AsNoTracking()` + `.Select()` projection. No new entities or migrations — uses existing `UserAttempt`, `QuestionSchedule`, `UserStreak`, `UserXp`. `ValidationException` thrown for invalid question IDs, caught by middleware → 400. `AttemptDto` and `SubjectAccuracyDto` are self-contained nested DTOs.
 
-### 1.8 Bookmarks (Phase 2.6)
+### 1.8 Bookmarks (Phase 2.6) ✅ COMPLETE
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| POST | `/api/bookmarks/collections` | JWT | `{ name, icon? }` | Create collection |
-| GET | `/api/bookmarks/collections` | JWT | — | List user's collections |
-| POST | `/api/bookmarks/collections/{id:guid}/items` | JWT | `{ questionId }` | Add question to collection |
-| DELETE | `/api/bookmarks/collections/{id:guid}/items/{questionId}` | JWT | — | Remove from collection |
-| GET | `/api/bookmarks/collections/{id:guid}/items` | JWT | — | List questions in collection |
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| POST | `/api/bookmarks/collections` | JWT | `{ name, icon? }` | `BookmarkCollectionDto` | Create a named bookmark collection with optional icon |
+| GET | `/api/bookmarks/collections` | JWT | — | `[BookmarkCollectionDto]` | List user's collections with item counts |
+| POST | `/api/bookmarks/collections/{id:guid}/items` | JWT | `{ questionId }` | `BookmarkItemDto` | Add question to collection. 400 on duplicate (unique constraint). 404 if collection not found or not owner. |
+| DELETE | `/api/bookmarks/collections/{id:guid}/items/{questionId:guid}` | JWT | — | `204 No Content` | Remove question from collection. 404 if item not found. |
+| GET | `/api/bookmarks/collections/{id:guid}/items` | JWT | `?page=1&pageSize=20` | `{ data: [QuestionDto], meta: MetaDto }` | Paginated questions in collection. Hides CorrectOption + Explanation via QuestionDto reuse. |
 
-### 1.9 Notes (Phase 2.6)
+**Implementation:** `BookmarksController.cs` with 5 endpoints injecting `IMediator`. Uses CQRS: `CreateCollectionCommandHandler` (creates BookmarkCollection with UserId, returns DTO), `GetCollectionsQueryHandler` (AsNoTracking + Select with c.Items.Count projection), `AddBookmarkItemCommandHandler` (validates collection ownership AND question existence, explicit AnyAsync duplicate check + DbUpdateException catch for PostgreSQL), `RemoveBookmarkItemCommandHandler` (verify collection ownership, find by CollectionId+QuestionId, Remove), `GetCollectionItemsQueryHandler` (verify collection ownership, paginated BookmarkItems joined to Questions, imports QuestionDto and MetaDto from GetQuestions). All queries use AsNoTracking + Select projection. Duplicate prevention is dual-layer: explicit existence check for InMemory reliability + unique constraint catch for PostgreSQL production.
 
-| Method | Endpoint | Auth | Params/Body | Description |
-|--------|----------|------|-------------|-------------|
-| POST | `/api/notes` | JWT | Multipart: `file, questionId?, topicId?` | Upload note image |
-| GET | `/api/notes` | JWT | `?questionId=X` or `?topicId=Y` | Get notes for question/topic |
-| DELETE | `/api/notes/{id:guid}` | JWT | — | Delete note |
+**DTOs:** `BookmarkCollectionDto` (id, name, icon, itemCount, createdAt), `BookmarkItemDto` (id, questionId, questionText, createdAt), `QuestionDto` and `MetaDto` imported from `Application.Questions.Queries.GetQuestions`.
+
+### 1.9 Notes (Phase 2.6) ✅ COMPLETE
+
+| Method | Endpoint | Auth | Params/Body | Response | Description |
+|--------|----------|------|-------------|----------|-------------|
+| POST | `/api/notes` | JWT | Multipart: `file` + query params `questionId?`, `topicId?`, `noteType?` | `NoteDto` | Upload note image (PNG/JPEG/WebP only, max 10MB). Saves via INoteStorageService. |
+| GET | `/api/notes` | JWT | `?questionId=X` or `?topicId=Y` | `[NoteDto]` | Get notes for a question or topic. 200 with empty array if none found. |
+| DELETE | `/api/notes/{id:guid}` | JWT | — | `204 No Content` | Delete note with ownership validation. Deletes from blob storage then DB. 404 if not found or not owner. |
+
+**Implementation:** `NotesController.cs` with 3 endpoints injecting `IMediator`. Uses `[RequestSizeLimit(10MB)]` on controller. `CreateNoteCommandHandler`: validates file size ≤10MB, checks MIME type against allowed set (image/png, image/jpeg, image/webp), generates unique filename via Guid+extension, saves to INoteStorageService, creates UserNote entity. `GetNotesQueryHandler`: AsNoTracking + Where(UserId) with optional QuestionId/TopicId filters, Select projection to NoteDto. `DeleteNoteCommandHandler`: verifies ownership (note.UserId == request.UserId), deletes from storage first, then removes from DB.
+
+**Service:** `INoteStorageService` — abstraction for blob/file storage with `SaveAsync(Stream, fileName, contentType)` and `DeleteAsync(blobUrl)`. Dev implementation: `LocalNoteStorageService` saves to `wwwroot/uploads/notes/`. Registered as singleton in Program.cs.
 
 ### 1.10 Friends (Phase 2.7)
 

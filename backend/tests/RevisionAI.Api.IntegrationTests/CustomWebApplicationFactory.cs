@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using RevisionAI.Api.IntegrationTests.Bookmarks;
 using RevisionAI.Application.Common.Interfaces;
 using RevisionAI.Domain.Entities;
 using RevisionAI.Infrastructure.Data;
@@ -35,6 +36,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
             // Remove background services that interfere with tests
             RemoveServiceByFullName(services, "HourlyQuestionService");
+
+            // Replace INoteStorageService with fake for testing
+            services.RemoveAll<INoteStorageService>();
+            services.AddSingleton<INoteStorageService, FakeNoteStorageService>();
         });
     }
 

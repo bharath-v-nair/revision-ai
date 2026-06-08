@@ -1269,3 +1269,65 @@ Api/Program.cs                          — registered ISm2Service as Sm2Service
 Application/Common/Interfaces/IAppDbContext.cs  — added QuestionSchedules DbSet
 Api/RevisionAI.Api.http                 — added Step 5 (8 SR test cases)
 ```
+
+---
+
+## 22. Phase 2.6 — Bookmarks & Notes ✅ COMPLETE
+
+### 22.1 Overview
+User content organization via bookmark collections (save/retrieve questions) and note uploads (handwritten/digital drawings). 8 JWT-secured endpoints across 2 controllers. Uses pre-existing entities from Phase 0.2 — no migrations needed. Notes stored via pluggable INoteStorageService abstraction (dev: local filesystem).
+
+### 22.2 API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | /api/bookmarks/collections | JWT | Create a named bookmark collection with optional icon |
+| GET | /api/bookmarks/collections | JWT | List user collections with item counts per collection |
+| POST | /api/bookmarks/collections/{id}/items | JWT | Add question to collection. 400 on duplicate. |
+| DELETE | /api/bookmarks/collections/{id}/items/{qid} | JWT | Remove question from collection. 400 if item not found. |
+| GET | /api/bookmarks/collections/{id}/items | JWT | Paginated questions (hides answers via QuestionDto reuse) |
+| POST | /api/notes | JWT | Upload note image (PNG/JPEG/WebP, max 10MB). INoteStorageService. |
+| GET | /api/notes | JWT | Get notes for question or topic. 200 with [] if none. |
+| DELETE | /api/notes/{id} | JWT | Delete note with ownership validation. Storage then DB. |
+
+### 22.3 Key Design Decisions
+
+- **Dual-layer duplicate prevention:** Explicit AnyAsync check + DbUpdateException catch for PostgreSQL UNIQUE
+- **QuestionDto reuse:** GetCollectionItems imports QuestionDto/MetaDto from GetQuestions
+- **INoteStorageService abstraction:** Dev → LocalNoteStorageService (wwwroot/uploads/notes/). Test double → FakeNoteStorageService. Prod → Azure Blob.
+- **MIME type validation:** image/png, image/jpeg, image/webp enforced in handler
+- **DTOs:** BookmarkCollectionDto, BookmarkItemDto, NoteDto. QuestionDto reused for collection items.
+
+### 22.4 Files Created/Modified (30 total)
+
+**New files (27):**
+```
+Application/Bookmarks/Commands/CreateCollection/ (3 files)
+Application/Bookmarks/Commands/AddBookmarkItem/ (3 files)
+Application/Bookmarks/Commands/RemoveBookmarkItem/ (2 files)
+Application/Bookmarks/Queries/GetCollections/ (3 files)
+Application/Bookmarks/Queries/GetCollectionItems/ (3 files)
+Application/Notes/Commands/CreateNote/ (3 files)
+Application/Notes/Commands/DeleteNote/ (2 files)
+Application/Notes/Queries/GetNotes/ (3 files)
+Application/Common/Interfaces/INoteStorageService.cs
+Infrastructure/Services/LocalNoteStorageService.cs
+Api/Controllers/BookmarksController.cs
+Api/Controllers/NotesController.cs
+tests/.../Bookmarks/FakeNoteStorageService.cs
+tests/.../Bookmarks/BookmarksNotesTests.cs
+```
+
+**Modified files (4):**
+```
+Application/Common/Interfaces/IAppDbContext.cs  — added BookmarkCollections, BookmarkItems, UserNotes
+Api/Program.cs                                  — registered INoteStorageService singleton
+Application/RevisionAI.Application.csproj       — added FrameworkReference for IFormFile
+tests/.../CustomWebApplicationFactory.cs        — DI replacement for note storage in tests
+```
+
+### 22.5 Verification
+```bash
+cd backend && dotnet build                                    # 0 errors, 0 warnings
+cd backend && dotnet test --filter "BookmarksNotesTests"      # 23 passed, 0 failed
+```
