@@ -69,9 +69,15 @@ AGENTS.md
 docs/DOCUMENTATION_STRATEGY.md
 docs/Interview.md
 docs/PostMortem-*.md
+docs/postmortems/
+docs/prompts/
 SUBJECT_TRACKER.md
 docs/SUBAGENTS.md
 docs/TESTING-GUIDE.md
+
+# ===== AI Tool Config (local, not for GitHub) =====
+.claudeignore
+.clineignore
 
 # ===== Pipeline Temp Files (Not for GitHub) =====
 temp_*.png
