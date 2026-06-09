@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { forkJoin } from 'rxjs';
+import { XpSummaryResponse, StreakResponse } from '../dashboard/dashboard.models';
 
 interface GamificationState {
   totalXp: number;
@@ -45,6 +46,17 @@ export const GamificationStore = signalStore(
           });
         },
         error: () => patchState(store, { isLoading: false }),
+      });
+    },
+    setData(xp: XpSummaryResponse, streaks: StreakResponse): void {
+      patchState(store, {
+        totalXp: xp.totalXp ?? 0,
+        currentLevel: xp.currentLevel ?? 1,
+        xpToNextLevel: xp.xpToNextLevel ?? 100,
+        currentStreak: streaks.currentStreak ?? 0,
+        longestStreak: streaks.longestStreak ?? 0,
+        isAtRisk: streaks.isAtRisk ?? false,
+        isLoading: false,
       });
     },
   })),

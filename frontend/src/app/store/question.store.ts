@@ -1,13 +1,5 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
-
-interface PendingQuestionDto {
-  id: string;
-  questionText: string;
-  options: { key: string; text: string }[];
-  subject: string;
-  topic: string;
-  scheduledFor: string;
-}
+import { PendingQuestionDto } from '../dashboard/dashboard.models';
 
 interface QuestionState {
   pendingQuestions: PendingQuestionDto[];
@@ -33,6 +25,9 @@ export const QuestionStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
   withMethods((store) => ({
+    setPending(questions: PendingQuestionDto[]): void {
+      patchState(store, { pendingQuestions: questions });
+    },
     selectOption(option: string): void {
       patchState(store, { selectedOption: option, answerState: 'selected' });
     },
