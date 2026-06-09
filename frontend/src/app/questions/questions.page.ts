@@ -18,6 +18,7 @@ import {
   MediaDto,
   AnswerResult,
 } from './question.models';
+import { BookmarkButtonComponent } from '../shared/question/bookmark-button/bookmark-button.component';
 
 type BrowseView = 'subjects' | 'chapters' | 'questions';
 
@@ -57,6 +58,7 @@ function subjectEmoji(iconName: string | null | undefined): string {
   imports: [
     RouterLink,
     QuestionCardComponent,
+    BookmarkButtonComponent,
   ],
   template: `
     <!-- Outer container: viewport height minus bottom nav -->
@@ -283,35 +285,45 @@ function subjectEmoji(iconName: string | null | undefined): string {
     @if (detailSheetOpen()) {
       <div class="fixed inset-0 z-50 flex items-end">
         <div class="absolute inset-0 bg-black/40" (click)="closeDetailSheet()"></div>
-        <div class="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col z-10">
+        <div class="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[92vh] flex flex-col z-10">
           <!-- Handle -->
           <div class="flex justify-center pt-3 pb-1 flex-shrink-0">
             <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
           </div>
           <!-- Header -->
           <div class="flex items-center justify-between px-4 pb-3 border-b border-gray-100 flex-shrink-0">
-            <div>
+            <div class="flex items-center gap-2">
               <span class="text-sm font-semibold text-gray-600">Q{{ detailQuestion()?.questionNumber }}</span>
               @if (detailQuestion()?.subjectName) {
-                <span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">
+                <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">
                   {{ detailQuestion()!.subjectName }}
                 </span>
               }
             </div>
-            <button class="p-1.5 rounded-full hover:bg-gray-100" (click)="closeDetailSheet()">
-              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <div class="flex items-center gap-1">
+              @if (detailQuestion()) {
+                <app-bookmark-button
+                  [questionId]="detailQuestion()!.id"
+                  (bookmarkToggled)="onBookmark($event)"
+                />
+              }
+              <button class="p-1.5 rounded-full hover:bg-gray-100" (click)="closeDetailSheet()">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Scrollable content -->
-          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div class="flex-1 overflow-y-auto p-4 space-y-3">
 
-            <!-- Media images -->
-            @if (detailFull()?.media?.length) {
+            <!-- Media images — load via /media endpoint BEFORE reveal, no correct answer exposed -->
+            @if (loadingDetailMedia()) {
+              <div class="rounded-xl bg-gray-100 animate-pulse h-40"></div>
+            } @else if (detailMedia().length) {
               <div class="space-y-2">
-                @for (m of detailFull()!.media; track m.id) {
+                @for (m of detailMedia(); track m.id) {
                   @if (isHttpUrl(m.blobUrl)) {
                     <figure class="rounded-xl overflow-hidden bg-gray-100">
                       <img
@@ -326,15 +338,11 @@ function subjectEmoji(iconName: string | null | undefined): string {
                     </figure>
                   } @else {
                     <div class="rounded-xl bg-gray-100 px-4 py-3 flex items-center gap-2 text-sm text-gray-500">
-                      <span class="text-xl">📷</span>
-                      <span>{{ m.description ?? 'Diagram (p. ' + m.pageNumber + ')' }}</span>
+                      <span>📷</span>
+                      <span class="italic">{{ m.description ?? 'Diagram (page ' + m.pageNumber + ')' }}</span>
                     </div>
                   }
                 }
-              </div>
-            } @else if (detailQuestion()?.hasMedia && !detailRevealed()) {
-              <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-2 text-sm text-amber-700">
-                <span>📷</span><span>This question has an image. Reveal answer to load it.</span>
               </div>
             }
 
@@ -343,22 +351,28 @@ function subjectEmoji(iconName: string | null | undefined): string {
               {{ detailQuestion()?.questionText }}
             </p>
 
-            <!-- Options -->
+            <!-- Options — selectable BEFORE reveal, shows result AFTER -->
             <div class="space-y-2.5">
               @for (opt of OPTIONS; track opt) {
-                <div
-                  class="px-4 py-3 rounded-2xl border-2 flex items-center gap-3 text-sm font-medium"
+                <button
+                  class="w-full text-left px-4 py-3 rounded-2xl border-2 flex items-center gap-3 text-sm font-medium transition-colors"
                   [class]="detailOptionClass(opt)"
+                  [disabled]="detailRevealed()"
+                  (click)="detailGuess.set(opt)"
                 >
                   <span
                     class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2"
                     [class]="detailOptionKeyClass(opt)"
                   >{{ opt }}</span>
-                  <span>{{ getDetailOptionText(opt) }}</span>
-                  @if (detailRevealed() && opt === detailFull()?.correctOption) {
-                    <span class="ml-auto text-green-600 font-bold text-base">✓</span>
+                  <span class="flex-1">{{ getDetailOptionText(opt) }}</span>
+                  @if (detailRevealed()) {
+                    @if (opt === detailFull()?.correctOption) {
+                      <span class="text-green-600 font-bold">✓</span>
+                    } @else if (opt === detailGuess() && opt !== detailFull()?.correctOption) {
+                      <span class="text-red-500">✗</span>
+                    }
                   }
-                </div>
+                </button>
               }
             </div>
 
@@ -369,14 +383,26 @@ function subjectEmoji(iconName: string | null | undefined): string {
                 [disabled]="loadingDetail()"
                 (click)="revealDetailAnswer()"
               >
-                {{ loadingDetail() ? 'Loading…' : 'Reveal Answer' }}
+                {{ loadingDetail() ? 'Loading…' : detailGuess() ? 'Check My Answer' : 'Reveal Answer' }}
               </button>
             } @else {
+              <!-- Result banner -->
+              @if (detailGuess()) {
+                <div
+                  class="rounded-2xl px-4 py-3 flex items-center gap-3"
+                  [class]="detailGuess() === detailFull()?.correctOption ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'"
+                >
+                  <span class="text-xl">{{ detailGuess() === detailFull()?.correctOption ? '✅' : '❌' }}</span>
+                  <span class="text-sm font-semibold"
+                        [class]="detailGuess() === detailFull()?.correctOption ? 'text-green-800' : 'text-red-800'">
+                    {{ detailGuess() === detailFull()?.correctOption ? 'Correct!' : 'Incorrect — correct answer is ' + detailFull()?.correctOption }}
+                  </span>
+                </div>
+              }
+              <!-- Explanation -->
               <div class="bg-gray-50 rounded-2xl p-4">
                 <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Explanation</p>
-                <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                  {{ detailFull()?.explanation }}
-                </p>
+                <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ detailFull()?.explanation }}</p>
               </div>
             }
           </div>
@@ -422,6 +448,9 @@ export default class QuestionsPage implements OnInit {
   protected detailFull = signal<QuestionDetailDto | null>(null);
   protected detailRevealed = signal(false);
   protected loadingDetail = signal(false);
+  protected detailMedia = signal<MediaDto[]>([]);
+  protected loadingDetailMedia = signal(false);
+  protected detailGuess = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadPending();
@@ -460,10 +489,8 @@ export default class QuestionsPage implements OnInit {
 
   protected onAnswered(event: { selectedOption: string; result: AnswerResult }): void {
     this.questionStore.markAnswered(event.result);
-    setTimeout(() => {
-      this.currentIndex.update(i => i + 1);
-      this.questionStore.advance();
-    }, 2000);
+    this.currentIndex.update(i => i + 1);
+    this.questionStore.advance();
   }
 
   protected onSkip(): void {
@@ -537,7 +564,18 @@ export default class QuestionsPage implements OnInit {
     this.detailFull.set(null);
     this.detailRevealed.set(false);
     this.loadingDetail.set(false);
+    this.detailMedia.set([]);
+    this.detailGuess.set(null);
     this.detailSheetOpen.set(true);
+
+    // Load media immediately (separate endpoint — doesn't expose correct answer)
+    if (q.hasMedia) {
+      this.loadingDetailMedia.set(true);
+      this.service.getQuestionMediaOnly(q.id).subscribe({
+        next: (res) => { this.detailMedia.set(res.data); this.loadingDetailMedia.set(false); },
+        error: () => this.loadingDetailMedia.set(false),
+      });
+    }
   }
 
   protected closeDetailSheet(): void {
@@ -559,17 +597,31 @@ export default class QuestionsPage implements OnInit {
   }
 
   protected detailOptionClass(opt: string): string {
-    if (!this.detailRevealed()) return 'bg-white border-gray-300 text-gray-700';
+    const guess = this.detailGuess();
+    const revealed = this.detailRevealed();
     const correct = this.detailFull()?.correctOption;
-    if (opt === correct) return 'bg-green-50 border-green-500 text-green-800';
-    return 'bg-white border-gray-200 text-gray-400';
+
+    if (revealed) {
+      if (opt === correct) return 'bg-green-50 border-green-500 text-green-800 cursor-default';
+      if (opt === guess && opt !== correct) return 'bg-red-50 border-red-400 text-red-800 cursor-default';
+      return 'bg-white border-gray-200 text-gray-400 opacity-60 cursor-default';
+    }
+    if (opt === guess) return 'bg-indigo-50 border-primary text-gray-900';
+    return 'bg-white border-gray-300 text-gray-700 hover:border-gray-400 active:bg-gray-50';
   }
 
   protected detailOptionKeyClass(opt: string): string {
-    if (!this.detailRevealed()) return 'border-gray-300 text-gray-500';
+    const guess = this.detailGuess();
+    const revealed = this.detailRevealed();
     const correct = this.detailFull()?.correctOption;
-    if (opt === correct) return 'border-green-500 bg-green-500 text-white';
-    return 'border-gray-200 text-gray-300';
+
+    if (revealed) {
+      if (opt === correct) return 'border-green-500 bg-green-500 text-white';
+      if (opt === guess) return 'border-red-400 bg-red-400 text-white';
+      return 'border-gray-200 text-gray-300';
+    }
+    if (opt === guess) return 'border-primary bg-primary text-white';
+    return 'border-gray-300 text-gray-500';
   }
 
   protected getDetailOptionText(opt: string): string {

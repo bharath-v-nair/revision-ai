@@ -60,6 +60,10 @@ export class QuestionService {
     return this.http.get<{ data: QuestionDetailDto }>(`/api/questions/${id}`);
   }
 
+  getQuestionMediaOnly(id: string): Observable<{ data: import('./question.models').MediaDto[] }> {
+    return this.http.get<{ data: import('./question.models').MediaDto[] }>(`/api/questions/${id}/media`);
+  }
+
   getBookmarkCollections(): Observable<{ data: BookmarkCollection[] }> {
     return this.http.get<{ data: BookmarkCollection[] }>('/api/bookmarks/collections');
   }
