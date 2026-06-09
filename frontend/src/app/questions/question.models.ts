@@ -12,9 +12,18 @@ export interface QuestionWithoutAnswersDto {
   chapterTitle: string | null;
 }
 
+export interface MediaDto {
+  id: string;
+  mediaType: string;
+  description: string | null;
+  blobUrl: string;
+  pageNumber: number;
+}
+
 export interface QuestionDetailDto extends QuestionWithoutAnswersDto {
   correctOption: string;
   explanation: string;
+  media: MediaDto[];
 }
 
 export interface PendingQuestionDto {

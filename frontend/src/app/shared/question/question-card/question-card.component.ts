@@ -130,7 +130,7 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed';
       />
     }
   `,
-  host: { class: 'block relative' },
+  host: { class: 'block relative h-full' },
 })
 export class QuestionCardComponent {
   private service = inject(QuestionService);
