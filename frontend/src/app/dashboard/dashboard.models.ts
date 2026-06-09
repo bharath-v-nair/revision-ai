@@ -38,20 +38,8 @@ export interface StreakResponse {
   isAtRisk: boolean;
 }
 
-export interface QuestionWithoutAnswersDto {
-  id: string;
-  questionText: string;
-  options: { key: string; text: string }[];
-  subject: string;
-  topic: string;
-}
-
-export interface PendingQuestionDto {
-  pendingQuestionId: string;
-  expiresAt: string;
-  question: QuestionWithoutAnswersDto;
-}
+export type { QuestionWithoutAnswersDto, PendingQuestionDto } from '../questions/question.models';
 
 export interface PendingQuestionsResponse {
-  data: PendingQuestionDto[];
+  data: import('../questions/question.models').PendingQuestionDto[];
 }
