@@ -31,8 +31,8 @@ export const GamificationStore = signalStore(
     load(): void {
       patchState(store, { isLoading: true });
       forkJoin({
-        xp: http.get<any>('http://localhost:5000/api/xp/summary'),
-        streaks: http.get<any>('http://localhost:5000/api/streaks'),
+        xp: http.get<any>('/api/xp/summary'),
+        streaks: http.get<any>('/api/streaks'),
       }).subscribe({
         next: ({ xp, streaks }) => {
           patchState(store, {

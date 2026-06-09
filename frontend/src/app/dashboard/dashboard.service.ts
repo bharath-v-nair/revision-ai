@@ -8,7 +8,7 @@ import {
   PendingQuestionsResponse,
 } from './dashboard.models';
 
-const BASE = 'http://localhost:5000/api';
+const BASE = '/api';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
