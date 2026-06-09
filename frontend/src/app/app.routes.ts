@@ -1,12 +1,12 @@
 import { Routes } from '@angular/router';
 import { AppLayoutComponent } from './shared/layout/app-layout/app-layout.component';
-import { authGuard } from './core/guards/auth.guard';
+import { authGuard, noAuthGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
 
   // Auth (no layout)
-  { path: 'auth/login', loadComponent: () => import('./auth/login/login.page') },
+  { path: 'auth/login', canActivate: [noAuthGuard], loadComponent: () => import('./auth/login/login.page') },
   { path: 'auth/callback', loadComponent: () => import('./auth/callback/callback.page') },
 
   // Authenticated (AppLayout wraps all)
