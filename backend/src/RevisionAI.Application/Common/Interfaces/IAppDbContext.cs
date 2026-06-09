@@ -23,6 +23,7 @@ public interface IAppDbContext
     DbSet<UserNote> UserNotes { get; }
     DbSet<Friendship> Friendships { get; }
     DbSet<XpTransaction> XpTransactions { get; }
+    DbSet<Achievement> Achievements { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

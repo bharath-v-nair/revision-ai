@@ -262,7 +262,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     public HttpClient CreateAuthenticatedClient()
     {
         HttpClient client = CreateClient();
-        string token = GenerateTestJwt();
+        string token = GenerateTestJwt(TestUserId, TestUserEmail, "Test User");
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue(
                 JwtBearerDefaults.AuthenticationScheme, token);
@@ -271,7 +271,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
     public HttpClient CreateUnauthenticatedClient() => CreateClient();
 
-    private string GenerateTestJwt()
+    /// <summary>
+    /// Generate a test JWT for any user. Useful when testing endpoints that
+    /// need a user other than TestUserId (e.g., user without XP data).
+    /// </summary>
+    public string GenerateTestJwt(Guid userId, string email, string displayName = "Test User")
     {
         string key = "dev-key-at-least-32-chars-long!!";
         SymmetricSecurityKey securityKey = new(Encoding.UTF8.GetBytes(key));
@@ -279,9 +283,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
         Claim[] claims =
         [
-            new Claim(JwtRegisteredClaimNames.Sub, TestUserId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, TestUserEmail),
-            new Claim("displayName", "Test User"),
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, email),
+            new Claim("displayName", displayName),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 
