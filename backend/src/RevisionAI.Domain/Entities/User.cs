@@ -24,4 +24,5 @@ public class User
     public ICollection<MockSession> MockSessions { get; set; } = new List<MockSession>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<Achievement> Achievements { get; set; } = new List<Achievement>();
+    public ICollection<QuestionReport> QuestionReports { get; set; } = new List<QuestionReport>();
 }

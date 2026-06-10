@@ -33,4 +33,5 @@ public class Question
     public ICollection<UserNote> UserNotes { get; set; } = new List<UserNote>();
     public ICollection<MockSessionAnswer> MockSessionAnswers { get; set; } = new List<MockSessionAnswer>();
     public ICollection<XpTransaction> XpTransactions { get; set; } = new List<XpTransaction>();
+    public ICollection<QuestionReport> QuestionReports { get; set; } = new List<QuestionReport>();
 }

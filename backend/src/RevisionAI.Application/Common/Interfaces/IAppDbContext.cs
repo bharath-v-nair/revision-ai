@@ -24,6 +24,7 @@ public interface IAppDbContext
     DbSet<Friendship> Friendships { get; }
     DbSet<XpTransaction> XpTransactions { get; }
     DbSet<Achievement> Achievements { get; }
+    DbSet<QuestionReport> QuestionReports { get; }
     void Add<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

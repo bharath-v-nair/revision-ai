@@ -32,6 +32,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     void IAppDbContext.Add<TEntity>(TEntity entity) => Add(entity);
     public DbSet<Achievement> Achievements => Set<Achievement>();
+    public DbSet<QuestionReport> QuestionReports => Set<QuestionReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,7 @@ public class AppDbContext : DbContext, IAppDbContext
         modelBuilder.ApplyConfiguration(new MockSessionAnswerConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new AchievementConfiguration());
+        modelBuilder.ApplyConfiguration(new QuestionReportConfiguration());
 
         // Seed data
         SeedData.SeedSubjects(modelBuilder);
