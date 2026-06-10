@@ -72,6 +72,32 @@ public class AnswerQuestionCommandHandler : IRequestHandler<AnswerQuestionComman
         // 6. Mark pending question as answered
         pendingQuestion.IsAnswered = true;
 
+        // 7. Seed SR queue — create a QuestionSchedule for this question if one doesn't exist.
+        // This is what makes the question appear in Daily Review after the user first encounters it.
+        // Correct answers: review in 1 day. Wrong answers: review in 10 minutes (0.007 days ≈ 10 min).
+        bool scheduleExists = await _context.QuestionSchedules
+            .AnyAsync(qs => qs.UserId == request.UserId && qs.QuestionId == pendingQuestion.QuestionId, cancellationToken);
+
+        if (!scheduleExists)
+        {
+            DateTime nextReview = isCorrect
+                ? DateTime.UtcNow.AddDays(1)
+                : DateTime.UtcNow.AddMinutes(10);
+
+            QuestionSchedule schedule = new()
+            {
+                Id = Guid.NewGuid(),
+                UserId = request.UserId,
+                QuestionId = pendingQuestion.QuestionId,
+                EaseFactor = 2.5,
+                Interval = isCorrect ? 1 : 0,
+                Repetitions = isCorrect ? 1 : 0,
+                NextReviewDate = nextReview,
+                LastReviewedAt = DateTime.UtcNow,
+            };
+            _context.Add(schedule);
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         // 7. Return response
