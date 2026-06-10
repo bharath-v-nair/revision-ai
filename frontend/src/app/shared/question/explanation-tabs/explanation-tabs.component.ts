@@ -205,8 +205,7 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
           } @else {
             <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
               <span class="text-3xl">📝</span>
-              <p class="text-gray-500 text-sm">No notes yet. Tap Upload to add one.</p>
-              <p class="text-xs text-gray-400">Supports images (PNG, JPG, WebP) and PDFs up to 20 MB</p>
+              <p class="text-gray-500 text-sm">No notes for this question or chapter yet — visit My Notes to upload study material.</p>
             </div>
           }
         }

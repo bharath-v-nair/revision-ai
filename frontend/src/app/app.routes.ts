@@ -34,6 +34,9 @@ export const routes: Routes = [
       { path: 'bookmarks', loadComponent: () => import('./bookmarks/collections/bookmark-collections.page') },
       { path: 'bookmarks/:id', loadComponent: () => import('./bookmarks/items/bookmark-items.page') },
 
+      // Notes
+      { path: 'notes', loadComponent: () => import('./notes/notes.page') },
+
       // Stats
       { path: 'stats', loadComponent: () => import('./stats/analytics.page') },
       { path: 'stats/question/:id', loadComponent: () => import('./stats/question-history/question-history.page') },

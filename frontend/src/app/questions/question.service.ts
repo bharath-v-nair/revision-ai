@@ -142,6 +142,14 @@ export class QuestionService {
     return this.http.get<NoteDto[]>(`/api/notes?questionId=${questionId}`);
   }
 
+  getUserNotes(filter?: { chapterId?: string; subjectId?: string }): Observable<NoteDto[]> {
+    const params: string[] = [];
+    if (filter?.chapterId) params.push(`chapterId=${filter.chapterId}`);
+    if (filter?.subjectId) params.push(`subjectId=${filter.subjectId}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return this.http.get<NoteDto[]>(`/api/notes${qs}`);
+  }
+
   uploadNote(questionId: string, file: File, noteType = 'Digital'): Observable<NoteDto> {
     const formData = new FormData();
     formData.append('file', file);
@@ -149,6 +157,16 @@ export class QuestionService {
       `/api/notes?questionId=${questionId}&noteType=${encodeURIComponent(noteType)}`,
       formData,
     );
+  }
+
+  createNoteForChapter(file: File, chapterId: string, questionId?: string): Observable<NoteDto> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const isPdf = file.type === 'application/pdf';
+    const noteType = isPdf ? 'PDF' : 'Digital';
+    let url = `/api/notes?chapterId=${chapterId}&noteType=${encodeURIComponent(noteType)}`;
+    if (questionId) url += `&questionId=${questionId}`;
+    return this.http.post<NoteDto>(url, formData);
   }
 
   deleteNote(id: string): Observable<void> {

@@ -38,8 +38,14 @@ public class UserNoteConfiguration : IEntityTypeConfiguration<UserNote>
             .HasForeignKey(n => n.TopicId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(n => n.Chapter)
+            .WithMany()
+            .HasForeignKey(n => n.ChapterId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(n => n.UserId);
         builder.HasIndex(n => n.QuestionId);
         builder.HasIndex(n => n.TopicId);
+        builder.HasIndex(n => n.ChapterId);
     }
 }

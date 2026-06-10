@@ -140,7 +140,12 @@ export interface SubjectReportIndexDto {
 export interface NoteDto {
   id: string;
   questionId: string | null;
+  chapterId: string | null;
   topicId: string | null;
+  chapterTitle: string;
+  chapterNumber: number;
+  subjectId: string | null;
+  subjectName: string;
   blobUrl: string;
   noteType: string;
   createdAt: string;

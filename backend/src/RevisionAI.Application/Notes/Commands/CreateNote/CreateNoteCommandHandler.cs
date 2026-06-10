@@ -34,6 +34,13 @@ public class CreateNoteCommandHandler : IRequestHandler<CreateNoteCommand, Creat
 
     public async Task<CreateNoteResponse> Handle(CreateNoteCommand request, CancellationToken cancellationToken)
     {
+        if (!request.ChapterId.HasValue && !request.QuestionId.HasValue)
+        {
+            throw new ValidationException(
+                "Either ChapterId or QuestionId must be provided.",
+                [new FluentValidation.Results.ValidationFailure("ChapterId", "Either ChapterId or QuestionId must be provided.")]);
+        }
+
         // Validate file size
         if (request.File.Length > MaxFileSizeBytes)
         {
@@ -72,6 +79,7 @@ public class CreateNoteCommandHandler : IRequestHandler<CreateNoteCommand, Creat
             Id = Guid.NewGuid(),
             UserId = request.UserId,
             QuestionId = request.QuestionId,
+            ChapterId = request.ChapterId,
             TopicId = request.TopicId,
             BlobUrl = blobUrl,
             NoteType = request.NoteType,
@@ -85,6 +93,7 @@ public class CreateNoteCommandHandler : IRequestHandler<CreateNoteCommand, Creat
         {
             Id = note.Id,
             QuestionId = note.QuestionId,
+            ChapterId = note.ChapterId,
             TopicId = note.TopicId,
             BlobUrl = note.BlobUrl,
             NoteType = note.NoteType,

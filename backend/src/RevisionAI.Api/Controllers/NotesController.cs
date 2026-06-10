@@ -28,6 +28,7 @@ public class NotesController : ControllerBase
     public async Task<ActionResult<CreateNoteResponse>> CreateNote(
         IFormFile file,
         [FromQuery] Guid? questionId,
+        [FromQuery] Guid? chapterId,
         [FromQuery] Guid? topicId,
         [FromQuery] string noteType = "Digital",
         CancellationToken cancellationToken = default)
@@ -38,6 +39,7 @@ public class NotesController : ControllerBase
         {
             UserId = userId,
             QuestionId = questionId,
+            ChapterId = chapterId,
             TopicId = topicId,
             NoteType = noteType,
             File = file
@@ -49,11 +51,13 @@ public class NotesController : ControllerBase
     }
 
     /// <summary>
-    /// Get notes for a question or topic.
+    /// Get notes for a question, chapter, subject, or all user notes.
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<GetNotesResponse>>> GetNotes(
         [FromQuery] Guid? questionId,
+        [FromQuery] Guid? chapterId,
+        [FromQuery] Guid? subjectId,
         [FromQuery] Guid? topicId,
         CancellationToken cancellationToken)
     {
@@ -63,6 +67,8 @@ public class NotesController : ControllerBase
         {
             UserId = userId,
             QuestionId = questionId,
+            ChapterId = chapterId,
+            SubjectId = subjectId,
             TopicId = topicId
         };
 

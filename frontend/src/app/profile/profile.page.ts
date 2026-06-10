@@ -156,6 +156,13 @@ export default class ProfilePage {
 
   protected readonly contentLinks: ProfileLink[] = [
     {
+      label: 'My Notes',
+      sublabel: 'Your study library',
+      route: '/notes',
+      emoji: '📝',
+      color: 'green',
+    },
+    {
       label: 'Bookmarks',
       sublabel: 'Saved questions',
       route: '/bookmarks',

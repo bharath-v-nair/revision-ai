@@ -6,5 +6,7 @@ public class GetNotesQuery : IRequest<List<GetNotesResponse>>
 {
     public Guid UserId { get; set; }
     public Guid? QuestionId { get; set; }
+    public Guid? ChapterId { get; set; }
+    public Guid? SubjectId { get; set; }
     public Guid? TopicId { get; set; }
 }
