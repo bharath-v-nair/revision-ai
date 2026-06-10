@@ -121,3 +121,7 @@ extract_radiology_toc.py
 scratch/
 docs/AI_EXTRACTION_GUIDE.md
 docs/MEDIA-IMAGES-GUIDE.md
+.ai_temp/
+test_*.png
+test_*.jpeg
+render_*.py
