@@ -11,7 +11,9 @@ import {
   QuestionWithoutAnswersDto,
   QuestionDetailDto,
   BookmarkCollection,
+  NoteDto,
 } from './question.models';
+import { DueQuestionDto, SrStatsDto, SrReviewResult } from '../review/review.models';
 
 @Injectable({ providedIn: 'root' })
 export class QuestionService {
@@ -64,25 +66,80 @@ export class QuestionService {
     return this.http.get<{ data: import('./question.models').MediaDto[] }>(`/api/questions/${id}/media`);
   }
 
-  getBookmarkCollections(): Observable<{ data: BookmarkCollection[] }> {
-    return this.http.get<{ data: BookmarkCollection[] }>('/api/bookmarks/collections');
+  // SR — plain response objects
+  getSrStats(): Observable<SrStatsDto> {
+    return this.http.get<SrStatsDto>('/api/spaced-repetition/stats');
+  }
+
+  getDueQuestions(
+    page = 1,
+    pageSize = 20,
+  ): Observable<{ data: DueQuestionDto[]; meta: PaginatedMeta }> {
+    return this.http.get<{ data: DueQuestionDto[]; meta: PaginatedMeta }>(
+      `/api/spaced-repetition/due?page=${page}&pageSize=${pageSize}`,
+    );
+  }
+
+  submitSrReview(
+    questionId: string,
+    selectedOption: string,
+    timeTakenMs: number,
+  ): Observable<SrReviewResult> {
+    return this.http.post<SrReviewResult>(
+      `/api/spaced-repetition/${questionId}/review`,
+      { selectedOption, timeTakenMs },
+    );
+  }
+
+  // Bookmarks — collections plain array, items paginated
+  getBookmarkCollections(): Observable<BookmarkCollection[]> {
+    return this.http.get<BookmarkCollection[]>('/api/bookmarks/collections');
+  }
+
+  createBookmarkCollection(name: string): Observable<BookmarkCollection> {
+    return this.http.post<BookmarkCollection>('/api/bookmarks/collections', { name });
+  }
+
+  deleteBookmarkCollection(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/bookmarks/collections/${id}`);
+  }
+
+  getBookmarkItems(
+    collectionId: string,
+    page = 1,
+    pageSize = 20,
+  ): Observable<{ data: QuestionWithoutAnswersDto[]; meta: PaginatedMeta }> {
+    return this.http.get<{ data: QuestionWithoutAnswersDto[]; meta: PaginatedMeta }>(
+      `/api/bookmarks/collections/${collectionId}/items?page=${page}&pageSize=${pageSize}`,
+    );
   }
 
   addBookmarkItem(collectionId: string, questionId: string): Observable<void> {
     return this.http.post<void>(`/api/bookmarks/collections/${collectionId}/items`, { questionId });
   }
 
-  createBookmarkCollection(name: string): Observable<{ data: BookmarkCollection }> {
-    return this.http.post<{ data: BookmarkCollection }>('/api/bookmarks/collections', { name });
+  deleteBookmarkItem(collectionId: string, questionId: string): Observable<void> {
+    return this.http.delete<void>(
+      `/api/bookmarks/collections/${collectionId}/items/${questionId}`,
+    );
+  }
+
+  // Notes — plain array response
+  getNotes(questionId: string): Observable<NoteDto[]> {
+    return this.http.get<NoteDto[]>(`/api/notes?questionId=${questionId}`);
+  }
+
+  uploadNote(questionId: string, file: File): Observable<NoteDto> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<NoteDto>(`/api/notes?questionId=${questionId}`, formData);
+  }
+
+  deleteNote(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/notes/${id}`);
   }
 
   tickStreak(): Observable<void> {
     return this.http.post<void>('/api/streaks/tick', {});
-  }
-
-  getNotes(questionId: string): Observable<{ data: { id: string; content: string; createdAt: string }[] }> {
-    return this.http.get<{ data: { id: string; content: string; createdAt: string }[] }>(
-      `/api/notes?questionId=${questionId}`,
-    );
   }
 }

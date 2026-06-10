@@ -71,13 +71,18 @@ import { BookmarkCollection } from '../../../questions/question.models';
             <p class="text-sm text-gray-400 text-center py-8">Loading…</p>
           } @else {
             @for (col of collections(); track col.id) {
-              <button
-                class="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between"
-                (click)="saveToCollection(col.id)"
-              >
-                <span class="text-sm font-medium text-gray-700">{{ col.name }}</span>
-                <span class="text-xs text-gray-400">{{ col.itemCount }} items</span>
-              </button>
+              <div class="space-y-1">
+                <button
+                  class="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between"
+                  (click)="saveToCollection(col.id)"
+                >
+                  <span class="text-sm font-medium text-gray-700">{{ col.name }}</span>
+                  <span class="text-xs text-gray-400">{{ col.itemCount }} items</span>
+                </button>
+                @if (duplicateCollectionId() === col.id) {
+                  <p class="text-xs text-orange-500 px-1">Already in this collection</p>
+                }
+              </div>
             }
 
             @if (!collections().length && !creatingNew()) {
@@ -92,7 +97,7 @@ import { BookmarkCollection } from '../../../questions/question.models';
             <div class="flex gap-2 items-center">
               <input
                 #newColInput
-                class="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                class="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Collection name…"
                 [value]="newCollectionName()"
                 (input)="newCollectionName.set($any($event.target).value)"
@@ -137,6 +142,7 @@ export class BookmarkButtonComponent implements AfterViewInit {
   protected creatingNew = signal(false);
   protected newCollectionName = signal('');
   protected saving = signal(false);
+  protected duplicateCollectionId = signal<string | null>(null);
 
   ngAfterViewInit(): void {}
 
@@ -158,17 +164,23 @@ export class BookmarkButtonComponent implements AfterViewInit {
   private loadCollections(): void {
     this.loadingCollections.set(true);
     this.service.getBookmarkCollections().subscribe({
-      next: (res) => { this.collections.set(res.data); this.loadingCollections.set(false); },
+      next: (collections) => { this.collections.set(collections); this.loadingCollections.set(false); },
       error: () => this.loadingCollections.set(false),
     });
   }
 
   protected saveToCollection(collectionId: string): void {
+    this.duplicateCollectionId.set(null);
     this.service.addBookmarkItem(collectionId, this.questionId()).subscribe({
       next: () => {
         this.bookmarked.set(true);
         this.bookmarkToggled.emit(this.questionId());
         this.closeSheet();
+      },
+      error: (err) => {
+        if (err.status === 400) {
+          this.duplicateCollectionId.set(collectionId);
+        }
       },
     });
   }
@@ -180,9 +192,10 @@ export class BookmarkButtonComponent implements AfterViewInit {
     this.service.createBookmarkCollection(name).subscribe({
       next: (res) => {
         this.saving.set(false);
-        this.saveToCollection(res.data.id);
         this.creatingNew.set(false);
         this.newCollectionName.set('');
+        if (this.newColInputRef) this.newColInputRef.nativeElement.value = '';
+        this.saveToCollection(res.id);
       },
       error: () => this.saving.set(false),
     });
@@ -193,5 +206,6 @@ export class BookmarkButtonComponent implements AfterViewInit {
     this.creatingNew.set(false);
     this.newCollectionName.set('');
     this.saving.set(false);
+    this.duplicateCollectionId.set(null);
   }
 }

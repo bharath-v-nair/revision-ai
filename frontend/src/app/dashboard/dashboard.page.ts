@@ -7,12 +7,14 @@ import {
   HostListener,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { DashboardStore } from './dashboard.store';
 import { GamificationStore } from '../store/gamification.store';
 import { AuthStore } from '../store/auth.store';
 import { SkeletonLoaderComponent } from '../shared/ui/skeleton-loader/skeleton-loader.component';
 import { StreakFlameComponent } from './components/streak-flame.component';
 import { XpBarComponent } from './components/xp-bar.component';
+import { SrStatsDto } from '../review/review.models';
 
 @Component({
   selector: 'app-dashboard',
@@ -205,10 +207,15 @@ import { XpBarComponent } from './components/xp-bar.component';
       <div class="grid grid-cols-2 gap-3 pb-2">
         <button
           routerLink="/review"
-          class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center hover:bg-gray-50 active:bg-gray-100 transition-colors"
+          class="relative bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center hover:bg-gray-50 active:bg-gray-100 transition-colors"
         >
           <span class="text-2xl block mb-1">📝</span>
           <span class="text-sm font-medium text-gray-700">Daily Review</span>
+          @if ((srStats()?.dueToday ?? 0) > 0) {
+            <span class="absolute top-2 right-2 min-w-[20px] h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+              {{ srStats()!.dueToday }}
+            </span>
+          }
         </button>
         <button
           routerLink="/stats"
@@ -226,8 +233,10 @@ export default class DashboardPage implements OnInit, OnDestroy {
   protected dashStore = inject(DashboardStore);
   protected gamStore = inject(GamificationStore);
   protected authStore = inject(AuthStore);
+  private http = inject(HttpClient);
 
   protected countdownDisplay = signal('--:--:--');
+  protected srStats = signal<SrStatsDto | null>(null);
 
   protected readonly greeting = this.getGreeting();
   protected readonly dateSubtitle = this.getDateSubtitle();
@@ -243,6 +252,9 @@ export default class DashboardPage implements OnInit, OnDestroy {
     this.dashStore.load();
     this.updateCountdown();
     this.intervalId = setInterval(() => this.updateCountdown(), 1000);
+    this.http.get<SrStatsDto>('/api/spaced-repetition/stats').subscribe({
+      next: (stats) => this.srStats.set(stats),
+    });
   }
 
   ngOnDestroy(): void {

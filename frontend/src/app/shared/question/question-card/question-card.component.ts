@@ -12,6 +12,7 @@ import {
   ViewChildren,
   QueryList,
 } from '@angular/core';
+import { Observable } from 'rxjs';
 import gsap from 'gsap';
 import {
   QuestionWithoutAnswersDto,
@@ -192,6 +193,9 @@ export class QuestionCardComponent {
 
   readonly isReported = input<boolean>(false);
 
+  // When provided (review mode), used instead of the default hourly-questions submit
+  readonly reviewSubmitFn = input<((opt: string) => Observable<AnswerResult>) | null>(null);
+
   readonly answered = output<{ selectedOption: string; result: AnswerResult }>();
   readonly skipped = output<void>();
   readonly bookmarkToggled = output<string>();
@@ -322,7 +326,12 @@ export class QuestionCardComponent {
     if (!sel) return;
     this.cardState.set('submitting');
 
-    this.service.submitAnswer(this.pendingQuestionId(), sel).subscribe({
+    const reviewFn = this.reviewSubmitFn();
+    const obs: Observable<AnswerResult> = reviewFn
+      ? reviewFn(sel)
+      : this.service.submitAnswer(this.pendingQuestionId(), sel);
+
+    obs.subscribe({
       next: (res) => {
         this.result.set(res);
         this.cardState.set('revealed');

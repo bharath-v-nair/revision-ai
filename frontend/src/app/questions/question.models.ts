@@ -75,7 +75,9 @@ export interface ChapterDto {
 export interface BookmarkCollection {
   id: string;
   name: string;
+  icon: string | null;
   itemCount: number;
+  createdAt: string;
 }
 
 export type QuestionIssue =
@@ -122,4 +124,13 @@ export interface SubjectReportIndexDto {
   subjectName: string;
   subjectSlug: string;
   totalFlagged: number;
+}
+
+export interface NoteDto {
+  id: string;
+  questionId: string | null;
+  topicId: string | null;
+  blobUrl: string;
+  noteType: string;
+  createdAt: string;
 }

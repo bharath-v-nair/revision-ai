@@ -11,13 +11,7 @@ import {
 } from '@angular/core';
 import gsap from 'gsap';
 import { QuestionService } from '../../../questions/question.service';
-import { MediaDto } from '../../../questions/question.models';
-
-interface Note {
-  id: string;
-  content: string;
-  createdAt: string;
-}
+import { MediaDto, NoteDto } from '../../../questions/question.models';
 
 @Component({
   selector: 'app-explanation-tabs',
@@ -52,16 +46,14 @@ interface Note {
             [class.border-transparent]="activeTab() !== tab.id"
             [class.text-gray-500]="activeTab() !== tab.id"
             (click)="activeTab.set(tab.id)"
-          >
-            {{ tab.label }}
-          </button>
+          >{{ tab.label }}</button>
         }
       </div>
 
       <!-- Tab content -->
       <div class="flex-1 overflow-y-auto p-4">
+
         @if (activeTab() === 'explanation') {
-          <!-- Explanation images -->
           @if (explanationMedia().length) {
             <div class="space-y-2 mb-4">
               @for (m of explanationMedia(); track m.id) {
@@ -86,32 +78,129 @@ interface Note {
             </div>
           }
           <p class="prose text-sm text-gray-700 leading-relaxed">{{ explanation() }}</p>
+
         } @else if (activeTab() === 'ai-tutor') {
           <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <span class="text-4xl">🤖</span>
             <p class="text-gray-500 text-sm">AI Tutor available with Pro subscription</p>
           </div>
+
         } @else if (activeTab() === 'notes') {
+          <!-- Upload button -->
+          <div class="mb-4">
+            <input
+              #fileInput
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              class="hidden"
+              (change)="onFileSelected($event)"
+            />
+            <button
+              class="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors font-medium"
+              [disabled]="uploadingNote()"
+              (click)="fileInput.click()"
+            >
+              @if (uploadingNote()) {
+                Uploading…
+              } @else {
+                + Upload Note
+              }
+            </button>
+
+            <!-- Preview before upload -->
+            @if (previewUrl()) {
+              <div class="mt-3 bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                <img [src]="previewUrl()!" class="w-14 h-14 object-cover rounded-lg flex-shrink-0" alt="Preview"/>
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs text-gray-600 truncate">{{ pendingFile()?.name }}</p>
+                  <p class="text-xs text-gray-400">{{ formatFileSize(pendingFile()?.size ?? 0) }}</p>
+                </div>
+                <button class="text-gray-400 hover:text-gray-600 p-1" (click)="clearPending()">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            }
+
+            @if (uploadError()) {
+              <p class="mt-2 text-xs text-red-500">{{ uploadError() }}</p>
+            }
+          </div>
+
+          <!-- Notes list -->
           @if (loadingNotes()) {
             <p class="text-sm text-gray-400 text-center py-8">Loading notes…</p>
           } @else if (notes().length) {
             <div class="space-y-3">
               @for (note of notes(); track note.id) {
-                <div class="bg-gray-50 rounded-xl p-3">
-                  <p class="text-sm text-gray-700">{{ note.content }}</p>
-                  <p class="text-xs text-gray-400 mt-1">{{ formatDate(note.createdAt) }}</p>
+                <div class="relative overflow-hidden rounded-xl">
+                  <!-- Note content -->
+                  <div
+                    class="bg-gray-50 rounded-xl p-3 flex items-start gap-3 transition-transform duration-200"
+                    [style.transform]="revealedNoteId() === note.id ? 'translateX(-72px)' : 'translateX(0)'"
+                    (touchstart)="onNoteTouchStart($event, note.id)"
+                    (touchmove)="onNoteTouchMove($event)"
+                    (touchend)="onNoteTouchEnd($event, note.id)"
+                  >
+                    <button
+                      class="flex-shrink-0"
+                      (click)="viewerNote.set(note)"
+                    >
+                      <img
+                        [src]="note.blobUrl"
+                        class="w-14 h-14 object-cover rounded-lg bg-gray-200"
+                        alt="Note thumbnail"
+                      />
+                    </button>
+                    <div class="flex-1 min-w-0">
+                      <span class="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full font-medium">
+                        {{ note.noteType || 'note' }}
+                      </span>
+                      <p class="text-xs text-gray-400 mt-1">{{ formatDate(note.createdAt) }}</p>
+                    </div>
+                  </div>
+                  <!-- Delete button (revealed on swipe) -->
+                  <button
+                    class="absolute right-0 top-0 bottom-0 w-[72px] bg-red-500 text-white text-xs font-medium rounded-r-xl flex items-center justify-center"
+                    (click)="deleteNote(note.id)"
+                  >Delete</button>
                 </div>
               }
             </div>
           } @else {
             <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
               <span class="text-3xl">📝</span>
-              <p class="text-gray-500 text-sm">No notes yet. Add notes in Phase 3.5.</p>
+              <p class="text-gray-500 text-sm">No notes yet. Tap Upload to add one.</p>
             </div>
           }
         }
+
       </div>
     </div>
+
+    <!-- Full-screen image viewer -->
+    @if (viewerNote()) {
+      <div
+        class="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+        (click)="viewerNote.set(null)"
+      >
+        <img
+          [src]="viewerNote()!.blobUrl"
+          class="max-w-full max-h-full object-contain"
+          alt="Note full view"
+          (click)="$event.stopPropagation()"
+        />
+        <button
+          class="absolute top-4 right-4 p-2 text-white/70 hover:text-white"
+          (click)="viewerNote.set(null)"
+        >
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    }
   `,
 })
 export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
@@ -125,8 +214,15 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   @ViewChild('sheet') sheetRef!: ElementRef<HTMLElement>;
 
   protected activeTab = signal<'explanation' | 'ai-tutor' | 'notes'>('explanation');
-  protected notes = signal<Note[]>([]);
+  protected notes = signal<NoteDto[]>([]);
   protected loadingNotes = signal(false);
+
+  protected uploadingNote = signal(false);
+  protected pendingFile = signal<File | null>(null);
+  protected previewUrl = signal<string | null>(null);
+  protected uploadError = signal<string | null>(null);
+  protected viewerNote = signal<NoteDto | null>(null);
+  protected revealedNoteId = signal<string | null>(null);
 
   protected tabs = [
     { id: 'explanation' as const, label: 'Explanation' },
@@ -136,6 +232,9 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
 
   private touchStartY = 0;
   private currentY = 0;
+  private noteTouchStartX = 0;
+  private noteTouchStartY = 0;
+  private noteGestureDirection: 'horizontal' | 'vertical' | null = null;
 
   ngAfterViewInit(): void {
     gsap.from(this.sheetRef.nativeElement, {
@@ -143,7 +242,6 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
       duration: 0.3,
       ease: 'power2.out',
     });
-
     this.loadNotes();
   }
 
@@ -152,10 +250,7 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   private loadNotes(): void {
     this.loadingNotes.set(true);
     this.service.getNotes(this.questionId()).subscribe({
-      next: (res) => {
-        this.notes.set(res.data);
-        this.loadingNotes.set(false);
-      },
+      next: (notes) => { this.notes.set(notes); this.loadingNotes.set(false); },
       error: () => this.loadingNotes.set(false),
     });
   }
@@ -189,11 +284,97 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // Note swipe-to-delete gesture
+  protected onNoteTouchStart(e: TouchEvent, _noteId: string): void {
+    this.noteTouchStartX = e.touches[0].clientX;
+    this.noteTouchStartY = e.touches[0].clientY;
+    this.noteGestureDirection = null;
+    // Prevent sheet drag when touching a note
+    e.stopPropagation();
+  }
+
+  protected onNoteTouchMove(e: TouchEvent): void {
+    e.stopPropagation();
+    const dx = e.touches[0].clientX - this.noteTouchStartX;
+    const dy = e.touches[0].clientY - this.noteTouchStartY;
+
+    if (!this.noteGestureDirection) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        this.noteGestureDirection = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+      }
+    }
+  }
+
+  protected onNoteTouchEnd(e: TouchEvent, noteId: string): void {
+    e.stopPropagation();
+    if (this.noteGestureDirection === 'horizontal') {
+      const dx = e.changedTouches[0].clientX - this.noteTouchStartX;
+      if (dx < -50) {
+        this.revealedNoteId.set(noteId);
+      } else if (dx > 30) {
+        this.revealedNoteId.set(null);
+      }
+    }
+    this.noteGestureDirection = null;
+  }
+
+  protected deleteNote(id: string): void {
+    this.service.deleteNote(id).subscribe({
+      next: () => {
+        this.notes.update(ns => ns.filter(n => n.id !== id));
+        this.revealedNoteId.set(null);
+      },
+    });
+  }
+
+  protected onFileSelected(e: Event): void {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    this.uploadError.set(null);
+
+    if (file.size > 10 * 1024 * 1024) {
+      this.uploadError.set('File exceeds 10 MB limit.');
+      return;
+    }
+
+    this.pendingFile.set(file);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => this.previewUrl.set(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    this.uploadingNote.set(true);
+    this.service.uploadNote(this.questionId(), file).subscribe({
+      next: (note) => {
+        this.notes.update(ns => [note, ...ns]);
+        this.uploadingNote.set(false);
+        this.clearPending();
+      },
+      error: () => {
+        this.uploadError.set('Upload failed. Please try again.');
+        this.uploadingNote.set(false);
+      },
+    });
+  }
+
+  protected clearPending(): void {
+    this.pendingFile.set(null);
+    this.previewUrl.set(null);
+    this.uploadError.set(null);
+  }
+
   protected isHttpUrl(url: string): boolean {
     return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
   }
 
   protected formatDate(iso: string): string {
     return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+  }
+
+  protected formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 }
