@@ -11,7 +11,7 @@ namespace RevisionAI.Api.Controllers;
 [ApiController]
 [Route("api/notes")]
 [Authorize]
-[RequestSizeLimit(10 * 1024 * 1024)] // 10 MB
+[RequestSizeLimit(20 * 1024 * 1024)] // 20 MB (PDFs can be larger)
 public class NotesController : ControllerBase
 {
     private readonly IMediator _mediator;

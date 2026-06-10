@@ -98,6 +98,7 @@ frontend/README.md
 
 # ===== Media / Static Files (served locally, uploaded to Azure Blob in prod) =====
 backend/src/RevisionAI.Api/wwwroot/media/
+backend/src/RevisionAI.Api/wwwroot/uploads/
 
 # ===== Azure =====
 *.azurepubxml

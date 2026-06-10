@@ -11,10 +11,17 @@ public class CreateNoteCommandHandler : IRequestHandler<CreateNoteCommand, Creat
     {
         "image/png",
         "image/jpeg",
-        "image/webp"
+        "image/webp",
+        "application/pdf",
+        "application/octet-stream", // some browsers send this for PDFs
     };
 
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".webp", ".pdf",
+    };
+
+    private const long MaxFileSizeBytes = 20 * 1024 * 1024; // 20 MB
 
     private readonly IAppDbContext _context;
     private readonly INoteStorageService _noteStorageService;
@@ -31,20 +38,23 @@ public class CreateNoteCommandHandler : IRequestHandler<CreateNoteCommand, Creat
         if (request.File.Length > MaxFileSizeBytes)
         {
             throw new ValidationException(
-                "File size exceeds maximum allowed size of 10 MB.",
-                [new FluentValidation.Results.ValidationFailure("File", "File size exceeds 10 MB.")]);
+                "File size exceeds the 20 MB limit.",
+                [new FluentValidation.Results.ValidationFailure("File", "File size exceeds 20 MB.")]);
         }
 
-        // Validate MIME type
-        if (!AllowedMimeTypes.Contains(request.File.ContentType))
+        // Validate: MIME type OR file extension must be allowed
+        string extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+        bool mimeAllowed = AllowedMimeTypes.Contains(request.File.ContentType);
+        bool extAllowed = AllowedExtensions.Contains(extension);
+
+        if (!mimeAllowed && !extAllowed)
         {
             throw new ValidationException(
-                "Invalid file type. Only PNG, JPEG, and WebP images are allowed.",
+                "Invalid file type. Only PNG, JPEG, WebP images and PDFs are allowed.",
                 [new FluentValidation.Results.ValidationFailure("File", "Invalid file type.")]);
         }
 
         // Generate unique filename
-        string extension = Path.GetExtension(request.File.FileName);
         if (string.IsNullOrEmpty(extension))
         {
             extension = ".png";

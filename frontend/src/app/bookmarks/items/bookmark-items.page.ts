@@ -7,14 +7,16 @@ import {
 } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import gsap from 'gsap';
 import { QuestionService } from '../../questions/question.service';
 import {
   QuestionWithoutAnswersDto,
   QuestionDetailDto,
   PaginatedMeta,
   MediaDto,
+  BookmarkCollection,
 } from '../../questions/question.models';
+
+type SortKey = 'newest' | 'oldest' | 'az';
 
 @Component({
   selector: 'app-bookmark-items',
@@ -32,29 +34,84 @@ import {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
-        <div>
-          <h1 class="text-lg font-bold text-gray-800">{{ collectionId }}</h1>
-          <p class="text-xs text-gray-400">{{ meta()?.totalCount ?? items().length }} questions</p>
+        <div class="flex-1 min-w-0">
+          <h1 class="text-lg font-bold text-gray-800 truncate">{{ collectionName() }}</h1>
+          <p class="text-xs text-gray-400">{{ filteredItems().length }} of {{ allItems().length }} questions</p>
         </div>
       </div>
+
+      <!-- Sort / Filter bar -->
+      @if (allItems().length > 0) {
+        <div class="bg-white border-b border-gray-100 px-4 py-2 flex gap-2 overflow-x-auto flex-shrink-0">
+          <!-- Sort -->
+          <select
+            class="text-xs border border-gray-200 rounded-xl px-2 py-1.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+            [value]="sortBy()"
+            (change)="sortBy.set($any($event.target).value)"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="az">A–Z</option>
+          </select>
+
+          <!-- Subject filter -->
+          @if (availableSubjects().length > 1) {
+            <select
+              class="text-xs border border-gray-200 rounded-xl px-2 py-1.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+              [value]="filterSubject()"
+              (change)="onSubjectFilterChange($any($event.target).value)"
+            >
+              <option value="">All subjects</option>
+              @for (s of availableSubjects(); track s) {
+                <option [value]="s">{{ s }}</option>
+              }
+            </select>
+          }
+
+          <!-- Chapter filter (only if subject chosen) -->
+          @if (filterSubject() && availableChapters().length > 1) {
+            <select
+              class="text-xs border border-gray-200 rounded-xl px-2 py-1.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+              [value]="filterChapter()"
+              (change)="filterChapter.set($any($event.target).value)"
+            >
+              <option value="">All chapters</option>
+              @for (c of availableChapters(); track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+          }
+
+          <!-- Clear filters badge -->
+          @if (filterSubject() || filterChapter()) {
+            <button
+              class="text-xs text-red-500 px-2 py-1.5 rounded-xl hover:bg-red-50 flex-shrink-0"
+              (click)="clearFilters()"
+            >× Clear</button>
+          }
+        </div>
+      }
 
       <!-- Body -->
       @if (loading()) {
         <div class="flex-1 flex items-center justify-center">
           <p class="text-gray-400 text-sm">Loading…</p>
         </div>
-      } @else if (items().length === 0) {
+      } @else if (filteredItems().length === 0 && allItems().length === 0) {
         <div class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
           <span class="text-4xl">🔖</span>
           <p class="text-gray-500 text-sm">No bookmarks in this collection yet</p>
         </div>
+      } @else if (filteredItems().length === 0) {
+        <div class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
+          <span class="text-4xl">🔍</span>
+          <p class="text-gray-500 text-sm">No questions match your filters</p>
+          <button class="text-primary text-sm font-medium" (click)="clearFilters()">Clear filters</button>
+        </div>
       } @else {
         <div class="flex-1 overflow-y-auto">
-          @for (item of items(); track item.id; let i = $index) {
-            <div
-              #itemRow
-              class="relative overflow-hidden border-b border-gray-100 bg-white"
-            >
+          @for (item of filteredItems(); track item.id; let i = $index) {
+            <div class="relative overflow-hidden border-b border-gray-100 bg-white">
               <!-- Swipeable content -->
               <div
                 class="px-4 py-3.5 transition-transform duration-200"
@@ -70,16 +127,23 @@ import {
                   </span>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm text-gray-800 leading-snug line-clamp-2">{{ item.questionText }}</p>
-                    @if (item.subjectName) {
-                      <span class="inline-block mt-1.5 px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full">
-                        {{ item.subjectName }}
-                      </span>
-                    }
+                    <div class="flex flex-wrap gap-1.5 mt-1.5">
+                      @if (item.subjectName) {
+                        <span class="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full">
+                          {{ item.subjectName }}
+                        </span>
+                      }
+                      @if (item.chapterTitle) {
+                        <span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                          {{ item.chapterTitle }}
+                        </span>
+                      }
+                    </div>
                   </div>
-                  <!-- Desktop: inline delete button (always visible on non-touch) -->
+                  <!-- Desktop: inline delete button -->
                   <button
                     class="hidden md:flex flex-shrink-0 p-1.5 rounded-full hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                    (click)="$event.stopPropagation(); deleteItem(item.id, i)"
+                    (click)="$event.stopPropagation(); deleteItem(item.id)"
                     aria-label="Delete bookmark"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +159,7 @@ import {
               <!-- Delete button (revealed on swipe, mobile only) -->
               <button
                 class="absolute right-0 top-0 bottom-0 w-[70px] bg-red-500 text-white text-xs font-semibold flex items-center justify-center md:hidden"
-                (click)="deleteItem(item.id, i)"
+                (click)="deleteItem(item.id)"
               >Delete</button>
             </div>
           }
@@ -181,11 +245,48 @@ export default class BookmarkItemsPage implements OnInit {
 
   protected readonly collectionId = this.route.snapshot.paramMap.get('id') ?? '';
 
-  protected items = signal<QuestionWithoutAnswersDto[]>([]);
+  protected allItems = signal<QuestionWithoutAnswersDto[]>([]);
   protected meta = signal<PaginatedMeta | null>(null);
   protected loading = signal(false);
   protected loadingMore = signal(false);
   protected revealedId = signal<string | null>(null);
+
+  protected sortBy = signal<SortKey>('newest');
+  protected filterSubject = signal('');
+  protected filterChapter = signal('');
+  protected collectionName = signal('Collection');
+
+  protected availableSubjects = computed(() =>
+    [...new Set(this.allItems().map(i => i.subjectName ?? '').filter(Boolean))].sort(),
+  );
+
+  protected availableChapters = computed(() => {
+    const sub = this.filterSubject();
+    if (!sub) return [];
+    return [...new Set(
+      this.allItems()
+        .filter(i => i.subjectName === sub)
+        .map(i => i.chapterTitle ?? '')
+        .filter(Boolean),
+    )].sort();
+  });
+
+  protected filteredItems = computed(() => {
+    let items = [...this.allItems()];
+
+    // Filter
+    const sub = this.filterSubject();
+    const ch = this.filterChapter();
+    if (sub) items = items.filter(i => i.subjectName === sub);
+    if (ch) items = items.filter(i => i.chapterTitle === ch);
+
+    // Sort (API returns newest first)
+    const sort = this.sortBy();
+    if (sort === 'oldest') items = items.reverse();
+    else if (sort === 'az') items = items.sort((a, b) => a.questionText.localeCompare(b.questionText));
+
+    return items;
+  });
 
   protected detailSheetOpen = signal(false);
   protected detailQuestion = signal<QuestionWithoutAnswersDto | null>(null);
@@ -203,16 +304,26 @@ export default class BookmarkItemsPage implements OnInit {
   private itemGestureDir: 'h' | 'v' | null = null;
 
   ngOnInit(): void {
+    this.loadCollectionName();
     this.loadPage(1);
+  }
+
+  private loadCollectionName(): void {
+    this.service.getBookmarkCollections().subscribe({
+      next: (cols) => {
+        const match = cols.find(c => c.id === this.collectionId);
+        if (match) this.collectionName.set(match.name);
+      },
+    });
   }
 
   private loadPage(page: number): void {
     if (page === 1) this.loading.set(true);
     else this.loadingMore.set(true);
 
-    this.service.getBookmarkItems(this.collectionId, page).subscribe({
+    this.service.getBookmarkItems(this.collectionId, page, 100).subscribe({
       next: (res) => {
-        this.items.update(prev => page === 1 ? res.data : [...prev, ...res.data]);
+        this.allItems.update(prev => page === 1 ? res.data : [...prev, ...res.data]);
         this.meta.set(res.meta);
         this.currentPage = page;
         this.loading.set(false);
@@ -226,7 +337,17 @@ export default class BookmarkItemsPage implements OnInit {
     this.loadPage(this.currentPage + 1);
   }
 
-  // Swipe-to-delete for items
+  protected onSubjectFilterChange(val: string): void {
+    this.filterSubject.set(val);
+    this.filterChapter.set('');
+  }
+
+  protected clearFilters(): void {
+    this.filterSubject.set('');
+    this.filterChapter.set('');
+  }
+
+  // Swipe-to-delete gesture
   protected onItemTouchStart(e: TouchEvent, _id: string): void {
     this.itemTouchStartX = e.touches[0].clientX;
     this.itemTouchStartY = e.touches[0].clientY;
@@ -250,10 +371,10 @@ export default class BookmarkItemsPage implements OnInit {
     this.itemGestureDir = null;
   }
 
-  protected deleteItem(questionId: string, index: number): void {
+  protected deleteItem(questionId: string): void {
     this.service.deleteBookmarkItem(this.collectionId, questionId).subscribe({
       next: () => {
-        this.items.update(its => its.filter(it => it.id !== questionId));
+        this.allItems.update(its => its.filter(it => it.id !== questionId));
         this.revealedId.set(null);
         this.meta.update(m => m ? { ...m, totalCount: m.totalCount - 1 } : m);
       },

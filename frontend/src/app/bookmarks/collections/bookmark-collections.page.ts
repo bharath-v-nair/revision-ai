@@ -34,45 +34,65 @@ import { BookmarkCollection } from '../../questions/question.models';
         <div class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
           <span class="text-5xl">📚</span>
           <h2 class="text-lg font-semibold text-gray-700">No collections yet</h2>
-          <p class="text-sm text-gray-500">Bookmark questions while answering</p>
+          <p class="text-sm text-gray-500">Bookmark questions while answering to get started</p>
+          <button
+            class="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold"
+            (click)="openCreateSheet()"
+          >Create Collection</button>
         </div>
       } @else {
         <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           @for (col of collections(); track col.id) {
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
               <!-- Main row -->
-              <div
-                class="flex items-center p-4 cursor-pointer active:bg-gray-50"
-                [routerLink]="['/bookmarks', col.id]"
-                (touchstart)="startLongPress(col.id)"
-                (touchend)="cancelLongPress()"
-                (touchcancel)="cancelLongPress()"
-                (mousedown)="startLongPress(col.id)"
-                (mouseup)="cancelLongPress()"
-                (mouseleave)="cancelLongPress()"
-              >
-                <span class="text-2xl mr-3">{{ col.icon ?? '📚' }}</span>
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-gray-800 text-sm">{{ col.name }}</p>
-                  <p class="text-xs text-gray-400 mt-0.5">{{ col.itemCount }} questions</p>
-                </div>
-                <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
+              <div class="flex items-center px-4 py-3.5">
+                <!-- Tappable area → navigate into collection -->
+                <a
+                  class="flex items-center flex-1 min-w-0 cursor-pointer active:opacity-80"
+                  [routerLink]="['/bookmarks', col.id]"
+                >
+                  <span class="text-2xl mr-3 flex-shrink-0">{{ col.icon ?? '📚' }}</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm truncate">{{ col.name }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ col.itemCount }} questions</p>
+                  </div>
+                </a>
+
+                <!-- ⋮ menu button — always visible -->
+                <button
+                  class="ml-2 p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 text-gray-400 flex-shrink-0"
+                  (click)="toggleMenu(col.id)"
+                  aria-label="Collection options"
+                >
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0z"/>
+                  </svg>
+                </button>
               </div>
 
-              <!-- Context actions (revealed on long press) -->
+              <!-- Context actions (visible when menu is open) -->
               @if (activeMenuId() === col.id) {
                 <div class="flex border-t border-gray-100">
                   <button
-                    class="flex-1 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100"
+                    class="flex-1 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-center gap-1.5"
                     (click)="startRename(col)"
-                  >Rename</button>
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    Rename
+                  </button>
                   <div class="w-px bg-gray-100"></div>
                   <button
-                    class="flex-1 py-3 text-sm font-medium text-red-500 hover:bg-red-50 active:bg-red-100"
+                    class="flex-1 py-3 text-sm font-medium text-red-500 hover:bg-red-50 active:bg-red-100 flex items-center justify-center gap-1.5"
                     (click)="deleteCollection(col.id)"
-                  >Delete</button>
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete
+                  </button>
                 </div>
               }
             </div>
@@ -125,9 +145,6 @@ export default class BookmarkCollectionsPage implements OnInit {
   protected saving = signal(false);
   protected renameTarget = signal<BookmarkCollection | null>(null);
 
-  private longPressTimer?: ReturnType<typeof setTimeout>;
-  private longPressTargetId: string | null = null;
-
   ngOnInit(): void {
     this.loadCollections();
   }
@@ -140,15 +157,8 @@ export default class BookmarkCollectionsPage implements OnInit {
     });
   }
 
-  protected startLongPress(id: string): void {
-    this.longPressTargetId = id;
-    this.longPressTimer = setTimeout(() => {
-      this.activeMenuId.set(this.longPressTargetId);
-    }, 500);
-  }
-
-  protected cancelLongPress(): void {
-    clearTimeout(this.longPressTimer);
+  protected toggleMenu(id: string): void {
+    this.activeMenuId.set(this.activeMenuId() === id ? null : id);
   }
 
   protected openCreateSheet(): void {
@@ -173,13 +183,16 @@ export default class BookmarkCollectionsPage implements OnInit {
 
     const target = this.renameTarget();
     if (target) {
-      // Rename: update locally (no separate rename endpoint; create new collection for now)
-      // Since the API doesn't expose a rename endpoint, update the name locally
-      this.collections.update(cs =>
-        cs.map(c => c.id === target.id ? { ...c, name } : c),
-      );
-      this.saving.set(false);
-      this.closeSheet();
+      this.service.renameBookmarkCollection(target.id, name).subscribe({
+        next: () => {
+          this.collections.update(cs =>
+            cs.map(c => c.id === target.id ? { ...c, name } : c),
+          );
+          this.saving.set(false);
+          this.closeSheet();
+        },
+        error: () => this.saving.set(false),
+      });
     } else {
       this.service.createBookmarkCollection(name).subscribe({
         next: (col) => {

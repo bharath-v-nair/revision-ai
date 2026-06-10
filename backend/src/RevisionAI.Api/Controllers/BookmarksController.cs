@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RevisionAI.Application.Bookmarks.Commands.AddBookmarkItem;
 using RevisionAI.Application.Bookmarks.Commands.CreateCollection;
+using RevisionAI.Application.Bookmarks.Commands.DeleteCollection;
 using RevisionAI.Application.Bookmarks.Commands.RemoveBookmarkItem;
+using RevisionAI.Application.Bookmarks.Commands.RenameCollection;
 using RevisionAI.Application.Bookmarks.Queries.GetCollectionItems;
 using RevisionAI.Application.Bookmarks.Queries.GetCollections;
 
@@ -61,6 +63,50 @@ public class BookmarksController : ControllerBase
         List<GetCollectionsResponse> result = await _mediator.Send(query, cancellationToken);
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Rename a bookmark collection.
+    /// </summary>
+    [HttpPatch("collections/{id:guid}")]
+    public async Task<IActionResult> RenameCollection(
+        Guid id,
+        [FromBody] RenameCollectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        Guid userId = GetUserId();
+
+        RenameCollectionCommand command = new()
+        {
+            UserId = userId,
+            CollectionId = id,
+            Name = request.Name,
+        };
+
+        await _mediator.Send(command, cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Delete a bookmark collection and all its items.
+    /// </summary>
+    [HttpDelete("collections/{id:guid}")]
+    public async Task<IActionResult> DeleteCollection(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        Guid userId = GetUserId();
+
+        DeleteCollectionCommand command = new()
+        {
+            UserId = userId,
+            CollectionId = id,
+        };
+
+        await _mediator.Send(command, cancellationToken);
+
+        return NoContent();
     }
 
     /// <summary>
@@ -150,4 +196,9 @@ public class CreateCollectionRequest
 public class AddBookmarkItemRequest
 {
     public Guid QuestionId { get; set; }
+}
+
+public class RenameCollectionRequest
+{
+    public string Name { get; set; } = string.Empty;
 }
