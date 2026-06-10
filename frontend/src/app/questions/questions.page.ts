@@ -17,8 +17,10 @@ import {
   QuestionDetailDto,
   MediaDto,
   AnswerResult,
+  QuestionReportDto,
 } from './question.models';
 import { BookmarkButtonComponent } from '../shared/question/bookmark-button/bookmark-button.component';
+import { QuestionReportSheetComponent } from '../shared/question/question-report/question-report-sheet.component';
 
 type BrowseView = 'subjects' | 'chapters' | 'questions';
 
@@ -59,6 +61,7 @@ function subjectEmoji(iconName: string | null | undefined): string {
     RouterLink,
     QuestionCardComponent,
     BookmarkButtonComponent,
+    QuestionReportSheetComponent,
   ],
   template: `
     <!-- Outer container: viewport height minus bottom nav -->
@@ -138,9 +141,11 @@ function subjectEmoji(iconName: string | null | undefined): string {
                 [questionIndex]="currentIndex()"
                 [totalQuestions]="pendingQuestions().length"
                 mode="hourly"
+                [isReported]="isQuestionReported(currentQuestion()!.question.id)"
                 (answered)="onAnswered($event)"
                 (skipped)="onSkip()"
                 (bookmarkToggled)="onBookmark($event)"
+                (reportTap)="openReportSheet(currentQuestion()!.question.id, currentQuestion()!.question.questionNumber)"
               />
             </div>
           }
@@ -281,6 +286,17 @@ function subjectEmoji(iconName: string | null | undefined): string {
 
     </div>
 
+    <!-- ─── REPORT ISSUE SHEET (QA feature) ─── -->
+    @if (reportSheetOpen()) {
+      <app-question-report-sheet
+        [questionId]="reportSheetQuestionId()"
+        [questionNumber]="reportSheetQuestionNumber()"
+        (dismissed)="reportSheetOpen.set(false)"
+        (submitted)="onReportSubmitted($event)"
+        (cleared)="onReportCleared()"
+      />
+    }
+
     <!-- ─── QUESTION DETAIL SHEET (Browse) ─── -->
     @if (detailSheetOpen()) {
       <div class="fixed inset-0 z-50 flex items-end">
@@ -302,6 +318,18 @@ function subjectEmoji(iconName: string | null | undefined): string {
             </div>
             <div class="flex items-center gap-1">
               @if (detailQuestion()) {
+                <!-- QA flag button — prominent in detail sheet (QA feature) -->
+                <button
+                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  [class]="isQuestionReported(detailQuestion()!.id) ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500 hover:bg-orange-50 hover:text-orange-400'"
+                  (click)="openReportSheet(detailQuestion()!.id, detailQuestion()!.questionNumber)"
+                >
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 01.707 1.707L13.414 9l3.293 3.293A1 1 0 0116 14H4a1 1 0 01-1-1V5zm0 0" clip-rule="evenodd"/>
+                    <path d="M3 5v9"/>
+                  </svg>
+                  {{ isQuestionReported(detailQuestion()!.id) ? 'Reported' : 'Report' }}
+                </button>
                 <app-bookmark-button
                   [questionId]="detailQuestion()!.id"
                   (bookmarkToggled)="onBookmark($event)"
@@ -318,12 +346,12 @@ function subjectEmoji(iconName: string | null | undefined): string {
           <!-- Scrollable content -->
           <div class="flex-1 overflow-y-auto p-4 space-y-3">
 
-            <!-- Media images — load via /media endpoint BEFORE reveal, no correct answer exposed -->
+            <!-- Question images — shown BEFORE answering -->
             @if (loadingDetailMedia()) {
               <div class="rounded-xl bg-gray-100 animate-pulse h-40"></div>
-            } @else if (detailMedia().length) {
+            } @else if (detailQuestionMedia().length) {
               <div class="space-y-2">
-                @for (m of detailMedia(); track m.id) {
+                @for (m of detailQuestionMedia(); track m.id) {
                   @if (isHttpUrl(m.blobUrl)) {
                     <figure class="rounded-xl overflow-hidden bg-gray-100">
                       <img
@@ -337,9 +365,9 @@ function subjectEmoji(iconName: string | null | undefined): string {
                       }
                     </figure>
                   } @else {
-                    <div class="rounded-xl bg-gray-100 px-4 py-3 flex items-center gap-2 text-sm text-gray-500">
-                      <span>📷</span>
-                      <span class="italic">{{ m.description ?? 'Diagram (page ' + m.pageNumber + ')' }}</span>
+                    <div class="rounded-xl bg-slate-100 border border-slate-200 px-3 py-2.5 flex items-center gap-2 text-sm text-slate-600">
+                      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                      <span class="italic">{{ m.description ?? ('Figure, page ' + m.pageNumber) }}</span>
                     </div>
                   }
                 }
@@ -400,8 +428,32 @@ function subjectEmoji(iconName: string | null | undefined): string {
                 </div>
               }
               <!-- Explanation -->
-              <div class="bg-gray-50 rounded-2xl p-4">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Explanation</p>
+              <div class="bg-gray-50 rounded-2xl p-4 space-y-3">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Explanation</p>
+                @if (detailExplanationMedia().length) {
+                  <div class="space-y-2">
+                    @for (m of detailExplanationMedia(); track m.id) {
+                      @if (isHttpUrl(m.blobUrl)) {
+                        <figure class="rounded-xl overflow-hidden bg-white border border-gray-200">
+                          <img
+                            [src]="m.blobUrl"
+                            [alt]="m.description ?? 'Explanation image'"
+                            class="w-full object-contain max-h-52"
+                            (error)="onImgError($event)"
+                          />
+                          @if (m.description) {
+                            <figcaption class="text-xs text-gray-500 px-3 py-1.5 italic">{{ m.description }}</figcaption>
+                          }
+                        </figure>
+                      } @else {
+                        <div class="rounded-xl bg-white border border-slate-200 px-3 py-2.5 flex items-center gap-2 text-sm text-slate-600">
+                          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          <span class="italic">{{ m.description ?? ('Figure, page ' + m.pageNumber) }}</span>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
                 <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ detailFull()?.explanation }}</p>
               </div>
             }
@@ -442,6 +494,12 @@ export default class QuestionsPage implements OnInit {
   protected browseHasMore = signal(false);
   protected browsePage = signal(1);
 
+  // Report sheet (QA feature)
+  protected reportSheetOpen = signal(false);
+  protected reportSheetQuestionId = signal<string>('');
+  protected reportSheetQuestionNumber = signal<number>(0);
+  protected reportedQuestionIds = signal(new Set<string>());
+
   // Detail sheet
   protected detailSheetOpen = signal(false);
   protected detailQuestion = signal<QuestionWithoutAnswersDto | null>(null);
@@ -451,6 +509,9 @@ export default class QuestionsPage implements OnInit {
   protected detailMedia = signal<MediaDto[]>([]);
   protected loadingDetailMedia = signal(false);
   protected detailGuess = signal<string | null>(null);
+
+  protected readonly detailQuestionMedia = computed(() => this.detailMedia().filter(m => !m.isExplanation));
+  protected readonly detailExplanationMedia = computed(() => this.detailMedia().filter(m => m.isExplanation));
 
   ngOnInit(): void {
     this.loadPending();
@@ -589,11 +650,39 @@ export default class QuestionsPage implements OnInit {
     this.service.getQuestionDetail(q.id).subscribe({
       next: (res) => {
         this.detailFull.set(res.data);
+        // Merge explanation media from the full detail response into detailMedia
+        // so detailExplanationMedia() computed signal picks them up
+        const existing = this.detailMedia();
+        const existingIds = new Set(existing.map(m => m.id));
+        const newItems = res.data.media.filter(m => !existingIds.has(m.id));
+        if (newItems.length) this.detailMedia.update(prev => [...prev, ...newItems]);
         this.detailRevealed.set(true);
         this.loadingDetail.set(false);
       },
       error: () => this.loadingDetail.set(false),
     });
+  }
+
+  // QA report sheet helpers
+  protected openReportSheet(questionId: string, questionNumber: number): void {
+    this.reportSheetQuestionId.set(questionId);
+    this.reportSheetQuestionNumber.set(questionNumber);
+    this.reportSheetOpen.set(true);
+  }
+
+  protected onReportSubmitted(report: QuestionReportDto): void {
+    this.reportedQuestionIds.update(s => new Set([...s, report.questionId]));
+    this.reportSheetOpen.set(false);
+  }
+
+  protected onReportCleared(): void {
+    const id = this.reportSheetQuestionId();
+    this.reportedQuestionIds.update(s => { const n = new Set(s); n.delete(id); return n; });
+    this.reportSheetOpen.set(false);
+  }
+
+  protected isQuestionReported(questionId: string): boolean {
+    return this.reportedQuestionIds().has(questionId);
   }
 
   protected detailOptionClass(opt: string): string {
@@ -629,7 +718,7 @@ export default class QuestionsPage implements OnInit {
   }
 
   protected isHttpUrl(url: string): boolean {
-    return url.startsWith('http://') || url.startsWith('https://');
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
   }
 
   protected onImgError(e: Event): void {

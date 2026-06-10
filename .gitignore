@@ -96,6 +96,9 @@ SUBJECT_TRACKER.md
 # ===== Auto-generated =====
 frontend/README.md
 
+# ===== Media / Static Files (served locally, uploaded to Azure Blob in prod) =====
+backend/src/RevisionAI.Api/wwwroot/media/
+
 # ===== Azure =====
 *.azurepubxml
 *.pubxml.user
@@ -116,3 +119,5 @@ extract_radiology_toc.py
 
 #===== Scratch / Temp Files =====
 scratch/
+docs/AI_EXTRACTION_GUIDE.md
+docs/MEDIA-IMAGES-GUIDE.md

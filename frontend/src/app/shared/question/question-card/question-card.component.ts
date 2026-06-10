@@ -3,6 +3,7 @@ import {
   input,
   output,
   signal,
+  computed,
   inject,
   effect,
   untracked,
@@ -56,6 +57,19 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
               {{ question().subjectName }}
             </span>
           }
+          <!-- QA flag button — subtle in card, removable (QA feature) -->
+          <button
+            class="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            [class.text-orange-400]="isReported()"
+            [class.text-gray-300]="!isReported()"
+            (click)="reportTap.emit()"
+            aria-label="Report issue"
+          >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 01.707 1.707L13.414 9l3.293 3.293A1 1 0 0116 14H4a1 1 0 01-1-1V5zm0 0" clip-rule="evenodd"/>
+              <path d="M3 5v9"/>
+            </svg>
+          </button>
           <app-bookmark-button
             [questionId]="question().id"
             (bookmarkToggled)="bookmarkToggled.emit($event)"
@@ -66,10 +80,10 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
       <!-- Scrollable area: media + question text -->
       <div class="flex-1 overflow-y-auto px-4 pt-4 pb-2">
 
-        <!-- Media images (shown BEFORE answering if available) -->
-        @if (mediaItems().length) {
+        <!-- Question images (shown BEFORE answering) -->
+        @if (questionMedia().length) {
           <div class="space-y-2 mb-4">
-            @for (m of mediaItems(); track m.id) {
+            @for (m of questionMedia(); track m.id) {
               @if (isHttpUrl(m.blobUrl)) {
                 <figure class="rounded-xl overflow-hidden bg-gray-100">
                   <img
@@ -83,9 +97,9 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
                   }
                 </figure>
               } @else {
-                <div class="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 flex items-center gap-2 text-sm text-amber-700">
-                  <span>📷</span>
-                  <span>{{ m.description ?? 'Diagram (page ' + m.pageNumber + ')' }}</span>
+                <div class="rounded-xl bg-slate-100 border border-slate-200 px-3 py-2.5 flex items-center gap-2 text-sm text-slate-600">
+                  <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  <span class="italic">{{ m.description ?? ('Figure, page ' + m.pageNumber) }}</span>
                 </div>
               }
             }
@@ -160,6 +174,7 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
       <app-explanation-tabs
         [explanation]="result()!.explanation"
         [questionId]="question().id"
+        [explanationMedia]="explanationMedia()"
         (dismissed)="showExplanation.set(false)"
       />
     }
@@ -175,9 +190,12 @@ export class QuestionCardComponent {
   readonly totalQuestions = input<number>(1);
   readonly pendingQuestionId = input<string>('');
 
+  readonly isReported = input<boolean>(false);
+
   readonly answered = output<{ selectedOption: string; result: AnswerResult }>();
   readonly skipped = output<void>();
   readonly bookmarkToggled = output<string>();
+  readonly reportTap = output<void>();
 
   @ViewChildren('optionBtn') optionBtns!: QueryList<ElementRef<HTMLElement>>;
   @ViewChild('xpToast') xpToastRef?: ElementRef<HTMLElement>;
@@ -192,6 +210,9 @@ export class QuestionCardComponent {
   protected mediaItems = signal<MediaDto[]>([]);
   protected loadingMedia = signal(false);
 
+  protected readonly questionMedia = computed(() => this.mediaItems().filter(m => !m.isExplanation));
+  protected readonly explanationMedia = computed(() => this.mediaItems().filter(m => m.isExplanation));
+
   private touchStartX = 0;
 
   constructor() {
@@ -199,12 +220,31 @@ export class QuestionCardComponent {
     effect(() => {
       const pqId = this.pendingQuestionId(); // reactive tracking
 
+      // Kill any in-flight GSAP tweens BEFORE resetting signals.
+      // GSAP writes inline styles (borderColor, scale, x) directly on DOM elements.
+      // If we don't kill them here, tweens queued from the previous question's
+      // runRevealAnimation() will fire on the new question's buttons and leave
+      // green borders / scales on options the user never touched.
+      untracked(() => {
+        this.optionBtns?.forEach(ref => {
+          gsap.killTweensOf(ref.nativeElement);
+        });
+      });
+
       this.cardState.set('idle');
       this.selectedOption.set(null);
       this.result.set(null);
       this.showExplanation.set(false);
       this.showXpToast.set(false);
       this.mediaItems.set([]);
+
+      // Clear GSAP residual inline styles after Angular has updated the DOM.
+      // (setTimeout(0) yields to the event loop so change detection completes first.)
+      setTimeout(() => {
+        this.optionBtns?.forEach(ref => {
+          gsap.set(ref.nativeElement, { clearProps: 'borderColor,scale,x' });
+        });
+      }, 0);
 
       const q = untracked(() => this.question());
       if (pqId && q?.hasMedia) {
@@ -335,7 +375,7 @@ export class QuestionCardComponent {
   }
 
   protected isHttpUrl(url: string): boolean {
-    return url.startsWith('http://') || url.startsWith('https://');
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
   }
 
   protected onImgError(e: Event): void {

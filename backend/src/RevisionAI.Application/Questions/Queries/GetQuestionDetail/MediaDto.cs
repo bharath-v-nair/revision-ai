@@ -7,4 +7,5 @@ public class MediaDto
     public string? Description { get; set; }
     public string BlobUrl { get; set; } = string.Empty;
     public int PageNumber { get; set; }
+    public bool IsExplanation { get; set; }
 }

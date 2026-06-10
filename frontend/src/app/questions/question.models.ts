@@ -18,6 +18,7 @@ export interface MediaDto {
   description: string | null;
   blobUrl: string;
   pageNumber: number;
+  isExplanation: boolean;
 }
 
 export interface QuestionDetailDto extends QuestionWithoutAnswersDto {
@@ -75,4 +76,50 @@ export interface BookmarkCollection {
   id: string;
   name: string;
   itemCount: number;
+}
+
+export type QuestionIssue =
+  | 'QuestionText'
+  | 'QuestionMedia'
+  | 'CorrectOption'
+  | 'ExplanationText'
+  | 'ExplanationImages'
+  | 'ExplanationTables';
+
+export interface QuestionReportDto {
+  reportId: string;
+  questionId: string;
+  questionNumber: number;
+  questionText: string;
+  issues: QuestionIssue[];
+  notes: string | null;
+  updatedAt: string;
+}
+
+export interface ChapterReportsDto {
+  chapterId: string;
+  chapterTitle: string;
+  flaggedCount: number;
+  reports: QuestionReportDto[];
+}
+
+export interface SubjectReportSummaryDto {
+  subjectId: string;
+  subjectName: string;
+  totalFlagged: number;
+  chapters: ChapterSummaryDto[];
+}
+
+export interface ChapterSummaryDto {
+  chapterId: string;
+  chapterNumber: number;
+  title: string;
+  flaggedCount: number;
+}
+
+export interface SubjectReportIndexDto {
+  subjectId: string;
+  subjectName: string;
+  subjectSlug: string;
+  totalFlagged: number;
 }

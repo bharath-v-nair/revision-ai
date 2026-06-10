@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import gsap from 'gsap';
 import { QuestionService } from '../../../questions/question.service';
+import { MediaDto } from '../../../questions/question.models';
 
 interface Note {
   id: string;
@@ -60,6 +61,30 @@ interface Note {
       <!-- Tab content -->
       <div class="flex-1 overflow-y-auto p-4">
         @if (activeTab() === 'explanation') {
+          <!-- Explanation images -->
+          @if (explanationMedia().length) {
+            <div class="space-y-2 mb-4">
+              @for (m of explanationMedia(); track m.id) {
+                @if (isHttpUrl(m.blobUrl)) {
+                  <figure class="rounded-xl overflow-hidden bg-gray-100">
+                    <img
+                      [src]="m.blobUrl"
+                      [alt]="m.description ?? 'Explanation image'"
+                      class="w-full object-contain max-h-52"
+                    />
+                    @if (m.description) {
+                      <figcaption class="text-xs text-gray-500 px-3 py-1.5 italic">{{ m.description }}</figcaption>
+                    }
+                  </figure>
+                } @else {
+                  <div class="rounded-xl bg-slate-100 border border-slate-200 px-3 py-2.5 flex items-center gap-2 text-sm text-slate-600">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span class="italic">{{ m.description ?? ('Figure, page ' + m.pageNumber) }}</span>
+                  </div>
+                }
+              }
+            </div>
+          }
           <p class="prose text-sm text-gray-700 leading-relaxed">{{ explanation() }}</p>
         } @else if (activeTab() === 'ai-tutor') {
           <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
@@ -94,6 +119,7 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
 
   readonly explanation = input.required<string>();
   readonly questionId = input.required<string>();
+  readonly explanationMedia = input<MediaDto[]>([]);
   readonly dismissed = output<void>();
 
   @ViewChild('sheet') sheetRef!: ElementRef<HTMLElement>;
@@ -161,6 +187,10 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
     } else {
       gsap.to(this.sheetRef.nativeElement, { y: 0, duration: 0.2, ease: 'power2.out' });
     }
+  }
+
+  protected isHttpUrl(url: string): boolean {
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
   }
 
   protected formatDate(iso: string): string {

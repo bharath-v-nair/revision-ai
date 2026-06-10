@@ -169,6 +169,7 @@ static async Task RunApiServer(string[] cliArgs)
         app.UseSwaggerUI();
     }
 
+    app.UseStaticFiles();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
     app.UseAuthorization();

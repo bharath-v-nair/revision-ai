@@ -45,6 +45,9 @@ export const routes: Routes = [
 
       // Friends + Leaderboard
       { path: 'friends', loadComponent: () => import('./friends/friends.page') },
+
+      // QA / Admin (development-only, remove when content is stable)
+      { path: 'admin/reports', loadComponent: () => import('./admin/reports/reports.page') },
     ],
   },
 

@@ -39,7 +39,8 @@ public class GetQuestionDetailQueryHandler : IRequestHandler<GetQuestionDetailQu
                     MediaType = m.MediaType,
                     Description = m.Description,
                     BlobUrl = m.BlobUrl,
-                    PageNumber = m.PageNumber
+                    PageNumber = m.PageNumber,
+                    IsExplanation = m.IsExplanation
                 }).ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);

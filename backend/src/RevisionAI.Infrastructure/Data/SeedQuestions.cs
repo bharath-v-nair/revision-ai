@@ -151,6 +151,7 @@ public static class SeedQuestions
                     newQuestions.Add(question);
 
                     // Map media arrays (tolerant: handle malformed entries)
+                    string mediaPrefix = $"/media/{subjectSlug}/chapter_{chapterJson.ChapterNumber}/";
                     if (qj.Media is { Count: > 0 })
                     {
                         foreach (JsonElement element in qj.Media)
@@ -158,7 +159,7 @@ public static class SeedQuestions
                             MediaJson? media = TryDeserializeMedia(element);
                             if (media is not null)
                             {
-                                newMedia.Add(MapMedia(media, question.Id));
+                                newMedia.Add(MapMedia(media, question.Id, isExplanation: false, mediaPrefix));
                             }
                         }
                     }
@@ -170,7 +171,7 @@ public static class SeedQuestions
                             MediaJson? media = TryDeserializeMedia(element);
                             if (media is not null)
                             {
-                                newMedia.Add(MapMedia(media, question.Id));
+                                newMedia.Add(MapMedia(media, question.Id, isExplanation: true, mediaPrefix));
                             }
                         }
                     }
@@ -427,14 +428,15 @@ public static class SeedQuestions
             }
             : null;
 
-    private static QuestionMedia MapMedia(MediaJson media, Guid questionId) => new()
+    private static QuestionMedia MapMedia(MediaJson media, Guid questionId, bool isExplanation, string mediaPrefix = "") => new()
     {
         Id = Guid.NewGuid(),
         QuestionId = questionId,
         MediaType = media.MediaType ?? "ClinicalImage",
         Description = media.Description,
-        BlobUrl = media.Filename ?? string.Empty,
+        BlobUrl = string.IsNullOrEmpty(media.Filename) ? string.Empty : mediaPrefix + media.Filename,
         PageNumber = media.PageNumber,
+        IsExplanation = isExplanation,
     };
 
     private static int ExtractChapterNumberFromPath(string jsonPath)

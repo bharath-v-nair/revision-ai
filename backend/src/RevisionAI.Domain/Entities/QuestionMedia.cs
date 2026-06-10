@@ -8,6 +8,7 @@ public class QuestionMedia
     public string? Description { get; set; }
     public string BlobUrl { get; set; } = string.Empty;
     public int PageNumber { get; set; }
+    public bool IsExplanation { get; set; }
 
     // Navigation
     public Question Question { get; set; } = null!;
