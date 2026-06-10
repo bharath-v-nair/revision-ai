@@ -43,7 +43,8 @@ public class GetMockResultsQueryHandler : IRequestHandler<GetMockResultsQuery, G
                 IsCorrect = a.IsCorrect,
                 CorrectOption = a.Question.CorrectOption,
                 Explanation = a.Question.Explanation,
-                TimeTakenMs = a.TimeTakenMs
+                TimeTakenMs = a.TimeTakenMs,
+                HasMedia = a.Question.HasMedia
             })
             .ToListAsync(cancellationToken);
 

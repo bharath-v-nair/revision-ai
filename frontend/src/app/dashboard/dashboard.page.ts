@@ -224,6 +224,19 @@ import { SrStatsDto } from '../review/review.models';
           <span class="text-2xl block mb-1">📊</span>
           <span class="text-sm font-medium text-gray-700">Full Stats</span>
         </button>
+        <button
+          routerLink="/mock"
+          class="col-span-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 shadow-sm text-white flex items-center justify-between hover:opacity-95 active:opacity-90 transition-opacity"
+        >
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🎯</span>
+            <div class="text-left">
+              <p class="text-sm font-semibold">Mock Test</p>
+              <p class="text-xs text-white/70 mt-0.5">Build a custom timed test</p>
+            </div>
+          </div>
+          <span class="text-white/60 text-lg">→</span>
+        </button>
       </div>
 
     </div>

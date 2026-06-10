@@ -141,6 +141,14 @@ static async Task RunApiServer(string[] cliArgs)
 
     WebApplication app = builder.Build();
 
+    // Apply any pending EF Core migrations on startup
+    using (IServiceScope migrationScope = app.Services.CreateScope())
+    {
+        AppDbContext migrationDb = migrationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await migrationDb.Database.MigrateAsync();
+        Log.Information("Database migrations applied successfully.");
+    }
+
     // Middleware: Catch FluentValidation exceptions and return 400 instead of 500
     app.Use(async (context, next) =>
     {

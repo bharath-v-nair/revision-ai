@@ -9,4 +9,5 @@ public class MockQuestionDto
     public string OptionB { get; set; } = string.Empty;
     public string OptionC { get; set; } = string.Empty;
     public string OptionD { get; set; } = string.Empty;
+    public bool HasMedia { get; set; }
 }

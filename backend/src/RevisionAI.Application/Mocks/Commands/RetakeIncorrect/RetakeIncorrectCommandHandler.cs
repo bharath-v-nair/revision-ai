@@ -93,7 +93,8 @@ public class RetakeIncorrectCommandHandler : IRequestHandler<RetakeIncorrectComm
                 OptionA = question.OptionA,
                 OptionB = question.OptionB,
                 OptionC = question.OptionC,
-                OptionD = question.OptionD
+                OptionD = question.OptionD,
+                HasMedia = question.HasMedia
             });
 
             displayOrder++;

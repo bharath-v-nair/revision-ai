@@ -14,4 +14,5 @@ public class MockResultQuestionDto
     public char CorrectOption { get; set; }
     public string Explanation { get; set; } = string.Empty;
     public int? TimeTakenMs { get; set; }
+    public bool HasMedia { get; set; }
 }

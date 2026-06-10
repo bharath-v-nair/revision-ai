@@ -83,7 +83,8 @@ public class GenerateMockCommandHandler : IRequestHandler<GenerateMockCommand, G
                 OptionA = question.OptionA,
                 OptionB = question.OptionB,
                 OptionC = question.OptionC,
-                OptionD = question.OptionD
+                OptionD = question.OptionD,
+                HasMedia = question.HasMedia
             });
 
             displayOrder++;

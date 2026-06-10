@@ -36,7 +36,8 @@ public class GetMockSessionQueryHandler : IRequestHandler<GetMockSessionQuery, G
                 OptionA = a.Question.OptionA,
                 OptionB = a.Question.OptionB,
                 OptionC = a.Question.OptionC,
-                OptionD = a.Question.OptionD
+                OptionD = a.Question.OptionD,
+                HasMedia = a.Question.HasMedia
             })
             .ToListAsync(cancellationToken);
 

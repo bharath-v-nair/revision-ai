@@ -21,6 +21,7 @@ import {
 } from './question.models';
 import { BookmarkButtonComponent } from '../shared/question/bookmark-button/bookmark-button.component';
 import { QuestionReportSheetComponent } from '../shared/question/question-report/question-report-sheet.component';
+import { ExplanationTabsComponent } from '../shared/question/explanation-tabs/explanation-tabs.component';
 
 type BrowseView = 'subjects' | 'chapters' | 'questions';
 
@@ -62,6 +63,7 @@ function subjectEmoji(iconName: string | null | undefined): string {
     QuestionCardComponent,
     BookmarkButtonComponent,
     QuestionReportSheetComponent,
+    ExplanationTabsComponent,
   ],
   template: `
     <!-- Outer container: viewport height minus bottom nav -->
@@ -335,6 +337,21 @@ function subjectEmoji(iconName: string | null | undefined): string {
                   (bookmarkToggled)="onBookmark($event)"
                 />
               }
+              <!-- AI Tutor shortcut -->
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                (click)="openBrowseTab('ai-tutor')"
+              >🤖 Tutor</button>
+              <!-- My Notes shortcut -->
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                (click)="openBrowseTab('notes')"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Notes
+              </button>
               <button class="p-1.5 rounded-full hover:bg-gray-100" (click)="closeDetailSheet()">
                 <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -461,6 +478,18 @@ function subjectEmoji(iconName: string | null | undefined): string {
         </div>
       </div>
     }
+
+    <!-- ─── BROWSE NOTES / AI TUTOR SHEET ─── -->
+    <!-- Rendered AFTER the detail sheet so it appears on top (same z-index, later in DOM wins) -->
+    @if (browseNotesOpen() && detailQuestion()) {
+      <app-explanation-tabs
+        [explanation]="detailFull()?.explanation ?? ''"
+        [questionId]="detailQuestion()!.id"
+        [explanationMedia]="detailExplanationMedia()"
+        [initialTab]="browseInitialTab()"
+        (dismissed)="browseNotesOpen.set(false)"
+      />
+    }
   `,
 })
 export default class QuestionsPage implements OnInit {
@@ -502,6 +531,8 @@ export default class QuestionsPage implements OnInit {
 
   // Detail sheet
   protected detailSheetOpen = signal(false);
+  protected browseNotesOpen = signal(false);
+  protected browseInitialTab = signal<'explanation' | 'ai-tutor' | 'notes'>('notes');
   protected detailQuestion = signal<QuestionWithoutAnswersDto | null>(null);
   protected detailFull = signal<QuestionDetailDto | null>(null);
   protected detailRevealed = signal(false);
@@ -641,6 +672,12 @@ export default class QuestionsPage implements OnInit {
 
   protected closeDetailSheet(): void {
     this.detailSheetOpen.set(false);
+    this.browseNotesOpen.set(false);
+  }
+
+  protected openBrowseTab(tab: 'explanation' | 'ai-tutor' | 'notes'): void {
+    this.browseInitialTab.set(tab);
+    this.browseNotesOpen.set(true);
   }
 
   protected revealDetailAnswer(): void {

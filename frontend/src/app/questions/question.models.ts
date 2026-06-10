@@ -93,6 +93,17 @@ export interface QuestionReportDto {
   questionId: string;
   questionNumber: number;
   questionText: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption: string;
+  explanation: string;
+  sourcePage: number;
+  hasMedia: boolean;
+  subjectName: string;
+  chapterTitle: string;
+  chapterNumber: number;
   issues: QuestionIssue[];
   notes: string | null;
   updatedAt: string;

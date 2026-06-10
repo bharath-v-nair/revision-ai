@@ -14,6 +14,15 @@ import {
   NoteDto,
 } from './question.models';
 import { DueQuestionDto, SrStatsDto, SrReviewResult } from '../review/review.models';
+import {
+  MockGenerateResponse,
+  MockSessionDetail,
+  MockAnswerDto,
+  MockAnswersResponse,
+  MockCompleteResponse,
+  MockResultsResponse,
+  MockHistoryResponse,
+} from '../mock/mock.models';
 
 @Injectable({ providedIn: 'root' })
 export class QuestionService {
@@ -104,6 +113,10 @@ export class QuestionService {
     return this.http.delete<void>(`/api/bookmarks/collections/${id}`);
   }
 
+  renameBookmarkCollection(id: string, name: string): Observable<void> {
+    return this.http.patch<void>(`/api/bookmarks/collections/${id}`, { name });
+  }
+
   getBookmarkItems(
     collectionId: string,
     page = 1,
@@ -129,10 +142,13 @@ export class QuestionService {
     return this.http.get<NoteDto[]>(`/api/notes?questionId=${questionId}`);
   }
 
-  uploadNote(questionId: string, file: File): Observable<NoteDto> {
+  uploadNote(questionId: string, file: File, noteType = 'Digital'): Observable<NoteDto> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<NoteDto>(`/api/notes?questionId=${questionId}`, formData);
+    return this.http.post<NoteDto>(
+      `/api/notes?questionId=${questionId}&noteType=${encodeURIComponent(noteType)}`,
+      formData,
+    );
   }
 
   deleteNote(id: string): Observable<void> {
@@ -141,5 +157,56 @@ export class QuestionService {
 
   tickStreak(): Observable<void> {
     return this.http.post<void>('/api/streaks/tick', {});
+  }
+
+  // Mocks
+  generateMock(
+    subjectIds: string[],
+    questionCount: number,
+    timeLimitMinutes?: number,
+  ): Observable<MockGenerateResponse> {
+    return this.http.post<MockGenerateResponse>('/api/mocks/generate', {
+      subjectIds,
+      questionCount,
+      ...(timeLimitMinutes ? { timeLimitMinutes } : {}),
+    });
+  }
+
+  getMockSession(mockSessionId: string): Observable<MockSessionDetail> {
+    return this.http.get<MockSessionDetail>(`/api/mocks/${mockSessionId}`);
+  }
+
+  submitMockAnswers(
+    mockSessionId: string,
+    answers: MockAnswerDto[],
+  ): Observable<MockAnswersResponse> {
+    return this.http.post<MockAnswersResponse>(
+      `/api/mocks/${mockSessionId}/answers`,
+      { answers },
+    );
+  }
+
+  completeMock(mockSessionId: string): Observable<MockCompleteResponse> {
+    return this.http.post<MockCompleteResponse>(
+      `/api/mocks/${mockSessionId}/complete`,
+      {},
+    );
+  }
+
+  getMockResults(mockSessionId: string): Observable<MockResultsResponse> {
+    return this.http.get<MockResultsResponse>(`/api/mocks/${mockSessionId}/results`);
+  }
+
+  getMockHistory(page = 1, pageSize = 20): Observable<MockHistoryResponse> {
+    return this.http.get<MockHistoryResponse>(
+      `/api/mocks/history?page=${page}&pageSize=${pageSize}`,
+    );
+  }
+
+  retakeIncorrect(previousMockSessionId: string): Observable<MockGenerateResponse> {
+    return this.http.post<MockGenerateResponse>(
+      '/api/mocks/generate/retake-incorrect',
+      { previousMockSessionId },
+    );
   }
 }

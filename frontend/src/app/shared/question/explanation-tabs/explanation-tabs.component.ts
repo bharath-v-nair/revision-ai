@@ -17,27 +17,27 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
   selector: 'app-explanation-tabs',
   imports: [],
   template: `
-    <!-- Backdrop -->
+    <!-- Backdrop — z-[51] so it sits above the detail sheet (z-50), making clicks register correctly -->
     <div
-      class="fixed inset-0 bg-black/30 z-40"
+      class="fixed inset-0 bg-black/30 z-[51]"
       (click)="dismiss()"
     ></div>
 
     <!-- Sheet -->
     <div
       #sheet
-      class="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col"
+      class="fixed bottom-0 left-0 right-0 z-[52] bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col"
       (touchstart)="onTouchStart($event)"
       (touchmove)="onTouchMove($event)"
       (touchend)="onTouchEnd()"
     >
       <!-- Drag handle -->
-      <div class="flex justify-center pt-3 pb-1">
+      <div class="flex justify-center pt-3 pb-1 flex-shrink-0">
         <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
       </div>
 
       <!-- Tab bar -->
-      <div class="flex border-b border-gray-100 px-4">
+      <div class="flex items-center border-b border-gray-100 px-4 flex-shrink-0">
         @for (tab of tabs; track tab.id) {
           <button
             class="py-3 px-4 text-sm font-medium border-b-2 transition-colors"
@@ -48,11 +48,22 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
             (click)="activeTab.set(tab.id)"
           >{{ tab.label }}</button>
         }
+        <!-- Close button -->
+        <button
+          class="ml-auto p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+          (click)="dismiss()"
+          aria-label="Close"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
 
       <!-- Tab content -->
       <div class="flex-1 overflow-y-auto p-4">
 
+        <!-- ── EXPLANATION ── -->
         @if (activeTab() === 'explanation') {
           @if (explanationMedia().length) {
             <div class="space-y-2 mb-4">
@@ -79,38 +90,52 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
           }
           <p class="prose text-sm text-gray-700 leading-relaxed">{{ explanation() }}</p>
 
+        <!-- ── AI TUTOR ── -->
         } @else if (activeTab() === 'ai-tutor') {
           <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <span class="text-4xl">🤖</span>
             <p class="text-gray-500 text-sm">AI Tutor available with Pro subscription</p>
           </div>
 
+        <!-- ── MY NOTES ── -->
         } @else if (activeTab() === 'notes') {
           <!-- Upload button -->
           <div class="mb-4">
             <input
               #fileInput
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/png,image/jpeg,image/webp,application/pdf"
               class="hidden"
               (change)="onFileSelected($event)"
             />
             <button
-              class="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors font-medium"
+              class="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors font-medium flex items-center justify-center gap-2"
               [disabled]="uploadingNote()"
               (click)="fileInput.click()"
             >
               @if (uploadingNote()) {
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
                 Uploading…
               } @else {
-                + Upload Note
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Upload Note (image or PDF, up to 20 MB)
               }
             </button>
 
-            <!-- Preview before upload -->
+            <!-- Preview before upload (image only) -->
             @if (previewUrl()) {
               <div class="mt-3 bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                <img [src]="previewUrl()!" class="w-14 h-14 object-cover rounded-lg flex-shrink-0" alt="Preview"/>
+                @if (pendingIsPdf()) {
+                  <div class="w-14 h-14 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center flex-shrink-0">
+                    <span class="text-2xl">📄</span>
+                  </div>
+                } @else {
+                  <img [src]="previewUrl()!" class="w-14 h-14 object-cover rounded-lg flex-shrink-0" alt="Preview"/>
+                }
                 <div class="flex-1 min-w-0">
                   <p class="text-xs text-gray-600 truncate">{{ pendingFile()?.name }}</p>
                   <p class="text-xs text-gray-400">{{ formatFileSize(pendingFile()?.size ?? 0) }}</p>
@@ -143,19 +168,28 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
                     (touchmove)="onNoteTouchMove($event)"
                     (touchend)="onNoteTouchEnd($event, note.id)"
                   >
+                    <!-- Thumbnail / PDF icon -->
                     <button
                       class="flex-shrink-0"
-                      (click)="viewerNote.set(note)"
+                      (click)="openNote(note)"
                     >
-                      <img
-                        [src]="note.blobUrl"
-                        class="w-14 h-14 object-cover rounded-lg bg-gray-200"
-                        alt="Note thumbnail"
-                      />
+                      @if (isPdf(note)) {
+                        <div class="w-14 h-14 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center gap-0.5">
+                          <span class="text-xl leading-none">📄</span>
+                          <span class="text-[9px] font-bold text-red-500 uppercase tracking-wide">PDF</span>
+                        </div>
+                      } @else {
+                        <img
+                          [src]="note.blobUrl"
+                          class="w-14 h-14 object-cover rounded-lg bg-gray-200"
+                          alt="Note thumbnail"
+                        />
+                      }
                     </button>
                     <div class="flex-1 min-w-0">
-                      <span class="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full font-medium">
-                        {{ note.noteType || 'note' }}
+                      <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
+                            [class]="isPdf(note) ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'">
+                        {{ isPdf(note) ? 'PDF' : (note.noteType || 'Note') }}
                       </span>
                       <p class="text-xs text-gray-400 mt-1">{{ formatDate(note.createdAt) }}</p>
                     </div>
@@ -172,6 +206,7 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
             <div class="flex flex-col items-center justify-center py-12 gap-3 text-center">
               <span class="text-3xl">📝</span>
               <p class="text-gray-500 text-sm">No notes yet. Tap Upload to add one.</p>
+              <p class="text-xs text-gray-400">Supports images (PNG, JPG, WebP) and PDFs up to 20 MB</p>
             </div>
           }
         }
@@ -179,7 +214,7 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
       </div>
     </div>
 
-    <!-- Full-screen image viewer -->
+    <!-- Full-screen image viewer (images only; PDFs open in new tab via openNote) -->
     @if (viewerNote()) {
       <div
         class="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
@@ -209,6 +244,7 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   readonly explanation = input.required<string>();
   readonly questionId = input.required<string>();
   readonly explanationMedia = input<MediaDto[]>([]);
+  readonly initialTab = input<'explanation' | 'ai-tutor' | 'notes'>('explanation');
   readonly dismissed = output<void>();
 
   @ViewChild('sheet') sheetRef!: ElementRef<HTMLElement>;
@@ -219,6 +255,7 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
 
   protected uploadingNote = signal(false);
   protected pendingFile = signal<File | null>(null);
+  protected pendingIsPdf = signal(false);
   protected previewUrl = signal<string | null>(null);
   protected uploadError = signal<string | null>(null);
   protected viewerNote = signal<NoteDto | null>(null);
@@ -237,6 +274,9 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   private noteGestureDirection: 'horizontal' | 'vertical' | null = null;
 
   ngAfterViewInit(): void {
+    // Honour the initialTab input
+    this.activeTab.set(this.initialTab());
+
     gsap.from(this.sheetRef.nativeElement, {
       y: '100%',
       duration: 0.3,
@@ -289,7 +329,6 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
     this.noteTouchStartX = e.touches[0].clientX;
     this.noteTouchStartY = e.touches[0].clientY;
     this.noteGestureDirection = null;
-    // Prevent sheet drag when touching a note
     e.stopPropagation();
   }
 
@@ -297,7 +336,6 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
     e.stopPropagation();
     const dx = e.touches[0].clientX - this.noteTouchStartX;
     const dy = e.touches[0].clientY - this.noteTouchStartY;
-
     if (!this.noteGestureDirection) {
       if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
         this.noteGestureDirection = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
@@ -327,39 +365,74 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  /** Open a note — PDFs go to a new browser tab, images go to the full-screen viewer */
+  protected openNote(note: NoteDto): void {
+    if (this.isPdf(note)) {
+      window.open(note.blobUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      this.viewerNote.set(note);
+    }
+  }
+
+  protected isPdf(note: NoteDto): boolean {
+    return (
+      note.noteType === 'PDF' ||
+      note.blobUrl.toLowerCase().endsWith('.pdf')
+    );
+  }
+
   protected onFileSelected(e: Event): void {
-    const file = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
 
     this.uploadError.set(null);
+    const isPdf = file.type === 'application/pdf';
 
-    if (file.size > 10 * 1024 * 1024) {
-      this.uploadError.set('File exceeds 10 MB limit.');
+    if (file.size > 20 * 1024 * 1024) {
+      this.uploadError.set('File exceeds the 20 MB limit.');
+      input.value = '';
       return;
     }
 
     this.pendingFile.set(file);
+    this.pendingIsPdf.set(isPdf);
 
-    const reader = new FileReader();
-    reader.onload = (ev) => this.previewUrl.set(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    if (isPdf) {
+      // Show a sentinel so the template uses the PDF icon card
+      this.previewUrl.set('pdf');
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => this.previewUrl.set(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
 
+    const noteType = isPdf ? 'PDF' : 'Digital';
     this.uploadingNote.set(true);
-    this.service.uploadNote(this.questionId(), file).subscribe({
+    this.service.uploadNote(this.questionId(), file, noteType).subscribe({
       next: (note) => {
         this.notes.update(ns => [note, ...ns]);
         this.uploadingNote.set(false);
         this.clearPending();
+        // Reset file input so the same file can be re-uploaded
+        input.value = '';
       },
-      error: () => {
-        this.uploadError.set('Upload failed. Please try again.');
+      error: (err) => {
+        const msg =
+          err?.error?.errors?.File?.[0] ??
+          err?.error?.title ??
+          err?.error?.message ??
+          'Upload failed. Please try again.';
+        this.uploadError.set(msg);
         this.uploadingNote.set(false);
+        input.value = '';
       },
     });
   }
 
   protected clearPending(): void {
     this.pendingFile.set(null);
+    this.pendingIsPdf.set(false);
     this.previewUrl.set(null);
     this.uploadError.set(null);
   }
@@ -369,7 +442,11 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   }
 
   protected formatDate(iso: string): string {
-    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+    return new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(iso));
   }
 
   protected formatFileSize(bytes: number): string {

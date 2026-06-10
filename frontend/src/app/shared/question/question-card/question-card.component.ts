@@ -39,15 +39,17 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
       <!-- Top bar -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
         <div class="flex items-center gap-3">
-          <button
-            class="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200"
-            (click)="skipped.emit()"
-            aria-label="Skip"
-          >
-            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-          </button>
+          @if (mode() !== 'mock') {
+            <button
+              class="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200"
+              (click)="skipped.emit()"
+              aria-label="Skip"
+            >
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+          }
           <span class="text-sm font-semibold text-gray-600">
             Q{{ questionIndex() + 1 }} / {{ totalQuestions() }}
           </span>
@@ -149,25 +151,27 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
         </div>
       }
 
-      <!-- Submit / Next button -->
-      <div class="px-4 pb-6 pt-2 flex-shrink-0">
-        <button
-          class="w-full py-4 rounded-2xl font-semibold text-sm transition-all duration-200"
-          [class]="submitBtnClass()"
-          [disabled]="cardState() === 'idle' || cardState() === 'submitting' || cardState() === 'completed'"
-          (click)="onSubmitOrNext()"
-        >
-          @if (cardState() === 'submitting') {
-            Checking…
-          } @else if (cardState() === 'revealed') {
-            Next Question →
-          } @else if (cardState() === 'completed') {
-            Loading next…
-          } @else {
-            Check Answer
-          }
-        </button>
-      </div>
+      <!-- Submit / Next button (hidden in mock mode — navigation handled by taker page) -->
+      @if (mode() !== 'mock') {
+        <div class="px-4 pb-6 pt-2 flex-shrink-0">
+          <button
+            class="w-full py-4 rounded-2xl font-semibold text-sm transition-all duration-200"
+            [class]="submitBtnClass()"
+            [disabled]="cardState() === 'idle' || cardState() === 'submitting' || cardState() === 'completed'"
+            (click)="onSubmitOrNext()"
+          >
+            @if (cardState() === 'submitting') {
+              Checking…
+            } @else if (cardState() === 'revealed') {
+              Next Question →
+            } @else if (cardState() === 'completed') {
+              Loading next…
+            } @else {
+              Check Answer
+            }
+          </button>
+        </div>
+      }
     </div>
 
     <!-- Explanation sheet -->
@@ -190,6 +194,7 @@ export class QuestionCardComponent {
   readonly questionIndex = input<number>(0);
   readonly totalQuestions = input<number>(1);
   readonly pendingQuestionId = input<string>('');
+  readonly initialSelectedOption = input<string | null>(null);
 
   readonly isReported = input<boolean>(false);
 
@@ -200,6 +205,7 @@ export class QuestionCardComponent {
   readonly skipped = output<void>();
   readonly bookmarkToggled = output<string>();
   readonly reportTap = output<void>();
+  readonly mockAnswered = output<{ questionId: string; selectedOption: string }>();
 
   @ViewChildren('optionBtn') optionBtns!: QueryList<ElementRef<HTMLElement>>;
   @ViewChild('xpToast') xpToastRef?: ElementRef<HTMLElement>;
@@ -249,6 +255,14 @@ export class QuestionCardComponent {
           gsap.set(ref.nativeElement, { clearProps: 'borderColor,scale,x' });
         });
       }, 0);
+
+      // In mock mode: restore the previously selected option when navigating back
+      const mode = untracked(() => this.mode());
+      const initSel = untracked(() => this.initialSelectedOption());
+      if (mode === 'mock' && initSel) {
+        this.selectedOption.set(initSel);
+        this.cardState.set('selected');
+      }
 
       const q = untracked(() => this.question());
       if (pqId && q?.hasMedia) {
@@ -306,11 +320,22 @@ export class QuestionCardComponent {
 
   protected selectOption(opt: string): void {
     if (this.cardState() !== 'idle' && this.cardState() !== 'selected') return;
+    // Mock mode: tapping the already-selected option deselects it (NEET PG negative marking)
+    if (this.mode() === 'mock' && this.selectedOption() === opt) {
+      this.selectedOption.set(null);
+      this.cardState.set('idle');
+      this.mockAnswered.emit({ questionId: this.question().id, selectedOption: '' });
+      return;
+    }
     this.selectedOption.set(opt);
     this.cardState.set('selected');
+    if (this.mode() === 'mock') {
+      this.mockAnswered.emit({ questionId: this.question().id, selectedOption: opt });
+    }
   }
 
   protected onSubmitOrNext(): void {
+    if (this.mode() === 'mock') return;
     const state = this.cardState();
     if (state === 'selected') {
       this.submit();
