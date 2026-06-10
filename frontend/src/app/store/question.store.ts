@@ -11,6 +11,7 @@ interface QuestionState {
   selectedOption: string | null;
   answerResult: AnswerResult | null;
   answeredCountSinceLastBatch: number;
+  recentAnsweredIds: string[];
   isLoading: boolean;
 }
 
@@ -21,6 +22,7 @@ const initialState: QuestionState = {
   selectedOption: null,
   answerResult: null,
   answeredCountSinceLastBatch: 0,
+  recentAnsweredIds: [],
   isLoading: false,
 };
 
@@ -36,7 +38,17 @@ export const QuestionStore = signalStore(
     },
     markAnswered(result: AnswerResult): void {
       const count = store.answeredCountSinceLastBatch() + 1;
-      patchState(store, { answerResult: result, answerState: 'submitted', answeredCountSinceLastBatch: count });
+      const currentQ = store.pendingQuestions()[store.currentQuestionIndex()];
+      const questionId = currentQ?.question?.id;
+      const recentIds = questionId
+        ? [...store.recentAnsweredIds().slice(-4), questionId]
+        : store.recentAnsweredIds();
+      patchState(store, {
+        answerResult: result,
+        answerState: 'submitted',
+        answeredCountSinceLastBatch: count,
+        recentAnsweredIds: recentIds,
+      });
       service.tickStreak().subscribe();
       gamStore.load();
     },
@@ -50,6 +62,9 @@ export const QuestionStore = signalStore(
         selectedOption: null,
         answerResult: null,
       });
+    },
+    resetBatchCount(): void {
+      patchState(store, { answeredCountSinceLastBatch: 0, recentAnsweredIds: [] });
     },
     reset(): void {
       patchState(store, initialState);
