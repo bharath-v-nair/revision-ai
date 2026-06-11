@@ -26,11 +26,8 @@ public class GetAchievementDetailQueryHandler : IRequestHandler<GetAchievementDe
         AchievementDefinition? def = Array.Find(AchievementDefinitions.All, d => d.Type == achievement?.AchievementKey);
 
         if (def is null || achievement is null)
-        {
             return null;
-        }
 
-        // Load progress data
         UserXp? userXp = await _context.UserXp
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
@@ -44,25 +41,34 @@ public class GetAchievementDetailQueryHandler : IRequestHandler<GetAchievementDe
             .Where(a => a.UserId == userId)
             .CountAsync(cancellationToken);
 
+        int correctAnswers = await _context.UserAttempts
+            .AsNoTracking()
+            .Where(a => a.UserId == userId && a.IsCorrect)
+            .CountAsync(cancellationToken);
+
         int totalMocksCompleted = await _context.MockSessions
             .AsNoTracking()
             .Where(m => m.UserId == userId && m.CompletedAt != null)
             .CountAsync(cancellationToken);
 
-        int totalXp = userXp?.TotalXp ?? 0;
-        int currentStreak = streak?.CurrentStreak ?? 0;
+        int totalBookmarks = await _context.BookmarkItems
+            .AsNoTracking()
+            .Where(b => b.Collection.UserId == userId)
+            .CountAsync(cancellationToken);
 
-        int progress = def.Type switch
-        {
-            string t when t.StartsWith("total_xp_", StringComparison.Ordinal) => totalXp,
-            string t when t.StartsWith("streak_", StringComparison.Ordinal) => currentStreak,
-            string t when t.StartsWith("questions_", StringComparison.Ordinal) => totalQuestionsAnswered,
-            string t when t.StartsWith("mocks_", StringComparison.Ordinal) => totalMocksCompleted,
-            _ => 0
-        };
+        int accuracyPercent = AchievementProgressHelper.CalcAccuracy(totalQuestionsAnswered, correctAnswers);
+
+        int progress = AchievementProgressHelper.GetProgress(
+            def.Type,
+            userXp?.TotalXp ?? 0,
+            streak?.CurrentStreak ?? 0,
+            totalQuestionsAnswered,
+            totalMocksCompleted,
+            accuracyPercent,
+            totalBookmarks);
 
         int progressPercent = def.ProgressMax > 0
-            ? Math.Min(100, (progress * 100) / def.ProgressMax)
+            ? Math.Min(100, progress * 100 / def.ProgressMax)
             : 100;
 
         return new AchievementDto

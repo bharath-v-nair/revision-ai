@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using RevisionAI.Application.Gamification;
 using RevisionAI.Application.Gamification.Commands.CheckAchievements;
 using RevisionAI.Application.Gamification.Dtos;
 
@@ -107,7 +108,7 @@ public class GamificationTests : IClassFixture<CustomWebApplicationFactory>
 
         List<AchievementDto>? result = await response.Content.ReadFromJsonAsync<List<AchievementDto>>();
         Assert.NotNull(result);
-        Assert.Equal(12, result.Count); // All 12 definitions
+        Assert.Equal(AchievementDefinitions.All.Length, result.Count); // All definitions
 
         // All should have valid names
         foreach (AchievementDto a in result)

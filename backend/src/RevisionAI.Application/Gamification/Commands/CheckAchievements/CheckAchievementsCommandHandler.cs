@@ -19,7 +19,6 @@ public class CheckAchievementsCommandHandler : IRequestHandler<CheckAchievements
     {
         Guid userId = request.UserId;
 
-        // Load current progress data
         UserXp? userXp = await _context.UserXp
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
@@ -33,15 +32,25 @@ public class CheckAchievementsCommandHandler : IRequestHandler<CheckAchievements
             .Where(a => a.UserId == userId)
             .CountAsync(cancellationToken);
 
+        int correctAnswers = await _context.UserAttempts
+            .AsNoTracking()
+            .Where(a => a.UserId == userId && a.IsCorrect)
+            .CountAsync(cancellationToken);
+
         int totalMocksCompleted = await _context.MockSessions
             .AsNoTracking()
             .Where(m => m.UserId == userId && m.CompletedAt != null)
             .CountAsync(cancellationToken);
 
+        int totalBookmarks = await _context.BookmarkItems
+            .AsNoTracking()
+            .Where(b => b.Collection.UserId == userId)
+            .CountAsync(cancellationToken);
+
         int totalXp = userXp?.TotalXp ?? 0;
         int currentStreak = streak?.CurrentStreak ?? 0;
+        int accuracyPercent = AchievementProgressHelper.CalcAccuracy(totalQuestionsAnswered, correctAnswers);
 
-        // Get existing achievement keys for this user
         var existingKeys = (await _context.Achievements
             .AsNoTracking()
             .Where(a => a.UserId == userId)
@@ -55,18 +64,12 @@ public class CheckAchievementsCommandHandler : IRequestHandler<CheckAchievements
         foreach (AchievementDefinition def in AchievementDefinitions.All)
         {
             if (existingKeys.Contains(def.Type))
-            {
-                continue; // Already unlocked
-            }
+                continue;
 
-            int progress = def.Type switch
-            {
-                string t when t.StartsWith("total_xp_", StringComparison.Ordinal) => totalXp,
-                string t when t.StartsWith("streak_", StringComparison.Ordinal) => currentStreak,
-                string t when t.StartsWith("questions_", StringComparison.Ordinal) => totalQuestionsAnswered,
-                string t when t.StartsWith("mocks_", StringComparison.Ordinal) => totalMocksCompleted,
-                _ => 0
-            };
+            int progress = AchievementProgressHelper.GetProgress(
+                def.Type, totalXp, currentStreak,
+                totalQuestionsAnswered, totalMocksCompleted,
+                accuracyPercent, totalBookmarks);
 
             if (progress >= def.ProgressMax)
             {
@@ -94,13 +97,8 @@ public class CheckAchievementsCommandHandler : IRequestHandler<CheckAchievements
         }
 
         if (newlyUnlocked.Count > 0)
-        {
             await _context.SaveChangesAsync(cancellationToken);
-        }
 
-        return new CheckAchievementsResponse
-        {
-            NewlyUnlocked = newlyUnlocked
-        };
+        return new CheckAchievementsResponse { NewlyUnlocked = newlyUnlocked };
     }
 }

@@ -187,19 +187,24 @@ export default class AchievementsPage implements OnInit {
 
   protected openDetail(a: AchievementDto): void {
     this.selectedAchievement.set(a);
-    this.loadingDetail.set(true);
+    this.loadingDetail.set(false);
     setTimeout(() => {
       const el = this.detailSheetRef?.nativeElement;
       if (el) gsap.fromTo(el, { y: '100%' }, { y: '0%', duration: 0.35, ease: 'power3.out' });
     }, 0);
 
-    this.http.get<AchievementDto>(`/api/achievements/${a.id}`).subscribe({
-      next: (detail) => {
-        this.selectedAchievement.set(detail);
-        this.loadingDetail.set(false);
-      },
-      error: () => this.loadingDetail.set(false),
-    });
+    // Only fetch detail from API for unlocked achievements (they have a real Guid ID)
+    const emptyGuid = '00000000-0000-0000-0000-000000000000';
+    if (a.isUnlocked && a.id && a.id !== emptyGuid) {
+      this.loadingDetail.set(true);
+      this.http.get<AchievementDto>(`/api/achievements/${a.id}`).subscribe({
+        next: (detail) => {
+          this.selectedAchievement.set(detail);
+          this.loadingDetail.set(false);
+        },
+        error: () => this.loadingDetail.set(false),
+      });
+    }
   }
 
   protected closeDetail(): void {
