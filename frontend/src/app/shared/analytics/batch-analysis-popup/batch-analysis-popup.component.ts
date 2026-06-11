@@ -24,7 +24,7 @@ import { AnalyticsStore } from '../../../store/analytics.store';
     <div
       #panel
       class="fixed bottom-0 left-0 right-0 mx-auto z-50 bg-white rounded-t-3xl p-6 overflow-y-auto"
-      style="max-width: 480px; max-height: 70vh;"
+      style="max-width: 480px; max-height: 75vh;"
     >
       <!-- Drag handle -->
       <div class="flex justify-center mb-5">
@@ -68,6 +68,20 @@ import { AnalyticsStore } from '../../../store/analytics.store';
           </div>
         </div>
 
+        <!-- Subjects covered -->
+        @if (analyticsStore.pendingBatchSubjectNames().length > 0) {
+          <div class="mb-5">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Subjects covered</p>
+            <div class="flex flex-wrap gap-2">
+              @for (subject of analyticsStore.pendingBatchSubjectNames(); track subject) {
+                <span class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
+                  {{ subject }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+
         <!-- Tip box -->
         <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
           <p class="text-sm text-amber-800">
@@ -81,9 +95,13 @@ import { AnalyticsStore } from '../../../store/analytics.store';
         <button
           class="w-full py-3.5 bg-primary text-white rounded-2xl font-semibold text-sm active:opacity-90"
           (click)="goToMock()"
-        >Start Targeted Mock</button>
+        >Build Mock for These Subjects</button>
         <button
-          class="w-full py-3.5 border-2 border-gray-200 text-gray-700 rounded-2xl font-semibold text-sm active:bg-gray-50"
+          class="w-full py-3.5 border-2 border-primary/30 text-primary rounded-2xl font-semibold text-sm active:bg-primary/5"
+          (click)="reviewQuestions()"
+        >Review These Questions</button>
+        <button
+          class="w-full py-3 text-gray-400 text-sm font-medium active:text-gray-600"
           (click)="dismiss()"
         >Dismiss</button>
       </div>
@@ -119,7 +137,17 @@ export class BatchAnalysisPopupComponent implements AfterViewInit {
   }
 
   protected goToMock(): void {
-    this.animateOut(() => this.router.navigate(['/mock']));
+    const subjects = this.analyticsStore.pendingBatchSubjectNames();
+    this.animateOut(() =>
+      this.router.navigate(['/mock'], { state: { preselectedSubjectNames: subjects } })
+    );
+  }
+
+  protected reviewQuestions(): void {
+    const ids = this.analyticsStore.pendingBatchQuestionIds();
+    this.animateOut(() =>
+      this.router.navigate(['/questions/history'], { state: { questionIds: ids } })
+    );
   }
 
   protected dismiss(): void {

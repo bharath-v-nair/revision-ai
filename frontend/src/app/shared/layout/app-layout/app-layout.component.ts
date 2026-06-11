@@ -38,8 +38,9 @@ export class AppLayoutComponent {
       }
 
       const ids = this.questionStore.recentAnsweredIds();
+      const subjects = this.questionStore.recentAnsweredSubjectNames();
       this.questionStore.resetBatchCount();
-      this.analyticsStore.triggerBatchPopup(ids);
+      this.analyticsStore.triggerBatchPopup(ids, subjects);
     });
   }
 }

@@ -12,6 +12,7 @@ interface QuestionState {
   answerResult: AnswerResult | null;
   answeredCountSinceLastBatch: number;
   recentAnsweredIds: string[];
+  recentAnsweredSubjectNames: string[];
   isLoading: boolean;
 }
 
@@ -23,6 +24,7 @@ const initialState: QuestionState = {
   answerResult: null,
   answeredCountSinceLastBatch: 0,
   recentAnsweredIds: [],
+  recentAnsweredSubjectNames: [],
   isLoading: false,
 };
 
@@ -43,11 +45,17 @@ export const QuestionStore = signalStore(
       const recentIds = questionId
         ? [...store.recentAnsweredIds().slice(-4), questionId]
         : store.recentAnsweredIds();
+      const subjectName = currentQ?.question?.subjectName ?? null;
+      const prevSubjects = store.recentAnsweredSubjectNames();
+      const recentSubjects = subjectName && !prevSubjects.includes(subjectName)
+        ? [...prevSubjects.slice(-4), subjectName]
+        : prevSubjects;
       patchState(store, {
         answerResult: result,
         answerState: 'submitted',
         answeredCountSinceLastBatch: count,
         recentAnsweredIds: recentIds,
+        recentAnsweredSubjectNames: recentSubjects,
       });
       service.tickStreak().subscribe();
       gamStore.load();
@@ -64,7 +72,7 @@ export const QuestionStore = signalStore(
       });
     },
     resetBatchCount(): void {
-      patchState(store, { answeredCountSinceLastBatch: 0, recentAnsweredIds: [] });
+      patchState(store, { answeredCountSinceLastBatch: 0, recentAnsweredIds: [], recentAnsweredSubjectNames: [] });
     },
     reset(): void {
       patchState(store, initialState);

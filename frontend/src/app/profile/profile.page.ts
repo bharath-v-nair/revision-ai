@@ -179,7 +179,7 @@ export default class ProfilePage {
     {
       label: 'XP History',
       sublabel: 'Points & streaks',
-      route: '/profile/xp-history',
+      route: '/profile/xp',
       emoji: '⚡',
       color: 'yellow',
     },

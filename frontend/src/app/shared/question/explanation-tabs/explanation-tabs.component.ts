@@ -73,10 +73,16 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
                     <img
                       [src]="m.blobUrl"
                       [alt]="m.description ?? 'Explanation image'"
-                      class="w-full object-contain max-h-52"
+                      class="w-full object-contain max-h-52 cursor-zoom-in active:opacity-80"
+                      (click)="activeExplanationImage.set(m)"
                     />
                     @if (m.description) {
-                      <figcaption class="text-xs text-gray-500 px-3 py-1.5 italic">{{ m.description }}</figcaption>
+                      <figcaption class="text-xs text-gray-500 px-3 py-1.5 italic">
+                        {{ m.description }} &nbsp;
+                        <span class="text-primary not-italic font-medium">(tap to zoom)</span>
+                      </figcaption>
+                    } @else {
+                      <figcaption class="text-xs text-primary px-3 py-1.5">Tap to zoom</figcaption>
                     }
                   </figure>
                 } @else {
@@ -213,7 +219,7 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
       </div>
     </div>
 
-    <!-- Full-screen image viewer (images only; PDFs open in new tab via openNote) -->
+    <!-- Full-screen image viewer (notes) -->
     @if (viewerNote()) {
       <div
         class="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
@@ -228,6 +234,36 @@ import { MediaDto, NoteDto } from '../../../questions/question.models';
         <button
           class="absolute top-4 right-4 p-2 text-white/70 hover:text-white"
           (click)="viewerNote.set(null)"
+        >
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    }
+
+    <!-- Full-screen zoom viewer for explanation images -->
+    @if (activeExplanationImage()) {
+      <div
+        class="fixed inset-0 z-[80] bg-black/95 flex flex-col items-center justify-center"
+        (click)="activeExplanationImage.set(null)"
+      >
+        <img
+          [src]="activeExplanationImage()!.blobUrl"
+          [alt]="activeExplanationImage()!.description ?? 'Explanation image'"
+          class="max-w-full max-h-[85vh] object-contain"
+          style="touch-action: pinch-zoom;"
+          (click)="$event.stopPropagation()"
+        />
+        @if (activeExplanationImage()!.description) {
+          <p class="text-white/60 text-xs text-center mt-3 px-6">
+            {{ activeExplanationImage()!.description }}
+          </p>
+        }
+        <p class="text-white/40 text-xs mt-2">Pinch to zoom · Tap to close</p>
+        <button
+          class="absolute top-4 right-4 p-2 text-white/60 hover:text-white"
+          (click)="activeExplanationImage.set(null)"
         >
           <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -258,6 +294,7 @@ export class ExplanationTabsComponent implements AfterViewInit, OnDestroy {
   protected previewUrl = signal<string | null>(null);
   protected uploadError = signal<string | null>(null);
   protected viewerNote = signal<NoteDto | null>(null);
+  protected activeExplanationImage = signal<MediaDto | null>(null);
   protected revealedNoteId = signal<string | null>(null);
 
   protected tabs = [

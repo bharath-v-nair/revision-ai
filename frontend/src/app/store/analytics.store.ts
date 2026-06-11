@@ -7,6 +7,7 @@ interface AnalyticsState {
   dashboard: AnalyticsDashboardResponse | null;
   batchResult: BatchAnalysisResponse | null;
   pendingBatchQuestionIds: string[];
+  pendingBatchSubjectNames: string[];
   showBatchPopup: boolean;
   isLoading: boolean;
 }
@@ -15,6 +16,7 @@ const initialState: AnalyticsState = {
   dashboard: null,
   batchResult: null,
   pendingBatchQuestionIds: [],
+  pendingBatchSubjectNames: [],
   showBatchPopup: false,
   isLoading: false,
 };
@@ -30,9 +32,10 @@ export const AnalyticsStore = signalStore(
         error: () => patchState(store, { isLoading: false }),
       });
     },
-    triggerBatchPopup(questionIds: string[]): void {
+    triggerBatchPopup(questionIds: string[], subjectNames: string[] = []): void {
       patchState(store, {
         pendingBatchQuestionIds: questionIds,
+        pendingBatchSubjectNames: subjectNames,
         showBatchPopup: true,
         batchResult: null,
       });

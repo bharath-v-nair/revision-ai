@@ -185,6 +185,21 @@ const TABS: { key: StatTab; label: string }[] = [
                 }
               </div>
 
+              <!-- Question History entry point -->
+              <a
+                routerLink="/questions/history"
+                class="flex items-center gap-4 bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 active:bg-gray-50"
+              >
+                <span class="text-2xl">🔍</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-semibold text-gray-800">Question History</div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    Browse all attempted questions and see your attempt timeline
+                  </div>
+                </div>
+                <span class="text-gray-300 text-sm flex-shrink-0">›</span>
+              </a>
+
               <!-- Coming next chips -->
               <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
                 <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-2">
@@ -271,21 +286,21 @@ const TABS: { key: StatTab; label: string }[] = [
                       <!-- Bar -->
                       <rect
                         [attr.x]="barX(i, chartMocks().length)"
-                        [attr.y]="barY(mock.score!)"
+                        [attr.y]="barY(mockAccuracy(mock))"
                         [attr.width]="barW(chartMocks().length)"
-                        [attr.height]="barH(mock.score!)"
+                        [attr.height]="barH(mockAccuracy(mock))"
                         rx="3"
-                        [attr.fill]="barColor(mock.score!)"
+                        [attr.fill]="barColor(mockAccuracy(mock))"
                       />
                       <!-- Score label -->
                       <text
                         [attr.x]="barCenterX(i, chartMocks().length)"
-                        [attr.y]="barY(mock.score!) - 4"
+                        [attr.y]="barY(mockAccuracy(mock)) - 4"
                         text-anchor="middle"
                         font-size="9"
                         font-weight="700"
-                        [attr.fill]="barColor(mock.score!)"
-                      >{{ mock.score }}%</text>
+                        [attr.fill]="barColor(mockAccuracy(mock))"
+                      >{{ mockAccuracy(mock) }}%</text>
                       <!-- Date label -->
                       <text
                         [attr.x]="barCenterX(i, chartMocks().length)"
@@ -328,8 +343,8 @@ const TABS: { key: StatTab; label: string }[] = [
                     <div class="flex items-center gap-2">
                       <span
                         class="text-base font-bold"
-                        [style.color]="barColor(mock.score!)"
-                      >{{ mock.score }}%</span>
+                        [style.color]="barColor(mockAccuracy(mock))"
+                      >{{ mockAccuracy(mock) }}%</span>
                       <span class="text-gray-300 text-sm">›</span>
                     </div>
                   </a>
@@ -589,20 +604,24 @@ export default class AnalyticsPage implements OnInit {
     [...this.completedMocks().slice(0, 8)].reverse(),
   );
 
+  protected mockAccuracy(mock: MockHistoryDto): number {
+    return Math.round((mock.score! / mock.questionCount) * 100);
+  }
+
   protected readonly mockBestScore = computed(() => {
-    const scores = this.completedMocks().map((m) => m.score!);
+    const scores = this.completedMocks().map((m) => this.mockAccuracy(m));
     return scores.length ? Math.max(...scores) : null;
   });
 
   protected readonly mockLatestScore = computed(() => {
     const c = this.completedMocks();
-    return c.length ? c[0].score! : null;
+    return c.length ? this.mockAccuracy(c[0]) : null;
   });
 
   protected readonly mockAvgScore = computed(() => {
     const c = this.completedMocks();
     if (!c.length) return null;
-    return Math.round(c.reduce((sum, m) => sum + m.score!, 0) / c.length);
+    return Math.round(c.reduce((sum, m) => sum + this.mockAccuracy(m), 0) / c.length);
   });
 
   protected readonly reviewRate = computed(() => {
@@ -706,9 +725,10 @@ export default class AnalyticsPage implements OnInit {
   }
 
   protected formatTime(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const total = Math.floor(seconds);
+    if (total < 60) return `${total}s`;
+    const m = Math.floor(total / 60);
+    const s = total % 60;
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   }
 }

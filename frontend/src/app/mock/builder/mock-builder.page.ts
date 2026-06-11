@@ -153,9 +153,22 @@ export default class MockBuilderPage implements OnInit {
     this.questionCount() <= 100,
   );
 
+  private preselectedSubjectNames: string[] = [];
+
   ngOnInit(): void {
+    this.preselectedSubjectNames = (window.history.state?.preselectedSubjectNames as string[]) ?? [];
     this.service.getSubjects().subscribe({
-      next: (res) => this.subjects.set(res.data),
+      next: (res) => {
+        this.subjects.set(res.data);
+        if (this.preselectedSubjectNames.length > 0) {
+          const matched = new Set(
+            res.data
+              .filter(s => this.preselectedSubjectNames.includes(s.name))
+              .map(s => s.id)
+          );
+          if (matched.size > 0) this.selectedSubjectIds.set(matched);
+        }
+      },
     });
   }
 
