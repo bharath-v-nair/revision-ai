@@ -21,6 +21,7 @@ import {
   MediaDto,
 } from '../../../questions/question.models';
 import { QuestionService } from '../../../questions/question.service';
+import { GamificationStore } from '../../../store/gamification.store';
 import { ExplanationTabsComponent } from '../explanation-tabs/explanation-tabs.component';
 import { BookmarkButtonComponent } from '../bookmark-button/bookmark-button.component';
 
@@ -144,13 +145,6 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
         }
       </div>
 
-      <!-- XP toast -->
-      @if (showXpToast()) {
-        <div #xpToast class="absolute left-1/2 -translate-x-1/2 bottom-28 bg-primary text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg opacity-0 pointer-events-none z-10">
-          +XP 🎉
-        </div>
-      }
-
       <!-- Submit / Next button (hidden in mock mode — navigation handled by taker page) -->
       @if (mode() !== 'mock') {
         <div class="px-4 pb-6 pt-2 flex-shrink-0">
@@ -188,6 +182,7 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
 })
 export class QuestionCardComponent {
   private service = inject(QuestionService);
+  private gamStore = inject(GamificationStore);
 
   readonly question = input.required<QuestionWithoutAnswersDto | QuestionDetailDto>();
   readonly mode = input<'hourly' | 'mock' | 'review'>('hourly');
@@ -208,14 +203,12 @@ export class QuestionCardComponent {
   readonly mockAnswered = output<{ questionId: string; selectedOption: string }>();
 
   @ViewChildren('optionBtn') optionBtns!: QueryList<ElementRef<HTMLElement>>;
-  @ViewChild('xpToast') xpToastRef?: ElementRef<HTMLElement>;
 
   protected readonly OPTIONS = ['A', 'B', 'C', 'D'] as const;
 
   protected cardState = signal<CardState>('idle');
   protected selectedOption = signal<string | null>(null);
   protected result = signal<AnswerResult | null>(null);
-  protected showXpToast = signal(false);
   protected showExplanation = signal(false);
   protected mediaItems = signal<MediaDto[]>([]);
   protected loadingMedia = signal(false);
@@ -245,7 +238,6 @@ export class QuestionCardComponent {
       this.selectedOption.set(null);
       this.result.set(null);
       this.showExplanation.set(false);
-      this.showXpToast.set(false);
       this.mediaItems.set([]);
 
       // Clear GSAP residual inline styles after Angular has updated the DOM.
@@ -361,6 +353,7 @@ export class QuestionCardComponent {
         this.result.set(res);
         this.cardState.set('revealed');
         this.runRevealAnimation(res);
+        this.gamStore.onAnswerCompleted();
       },
       error: () => this.cardState.set('selected'),
     });
@@ -375,8 +368,7 @@ export class QuestionCardComponent {
     if (res.isCorrect) {
       gsap.timeline()
         .to(selectedEl, { scale: 1.05, duration: 0.15, ease: 'power2.out', yoyo: true, repeat: 1 })
-        .call(() => this.glowCorrect(res.correctOption))
-        .call(() => this.showXpFloat(), [], '+=0.1');
+        .call(() => this.glowCorrect(res.correctOption));
     } else {
       gsap.to(selectedEl, {
         keyframes: { x: [-5, 5, -5, 5, 0] },
@@ -393,19 +385,6 @@ export class QuestionCardComponent {
     const idx = this.OPTIONS.indexOf(correctOption as any);
     const el = this.optionBtns.toArray()[idx]?.nativeElement;
     if (el) gsap.to(el, { borderColor: '#22C55E', duration: 0.3 });
-  }
-
-  private showXpFloat(): void {
-    this.showXpToast.set(true);
-    setTimeout(() => {
-      const toast = this.xpToastRef?.nativeElement;
-      if (toast) {
-        gsap.timeline()
-          .to(toast, { opacity: 1, y: -20, duration: 0.3 })
-          .to(toast, { opacity: 0, y: -40, duration: 0.3, delay: 0.8 })
-          .call(() => this.showXpToast.set(false));
-      }
-    });
   }
 
   protected isHttpUrl(url: string): boolean {

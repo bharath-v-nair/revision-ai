@@ -38,6 +38,17 @@ export interface StreakResponse {
   isAtRisk: boolean;
 }
 
+export interface AchievementDto {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  iconUrl: string;
+  progressPercent: number;
+  isUnlocked: boolean;
+  unlockedAt: string | null;
+}
+
 export type { QuestionWithoutAnswersDto, PendingQuestionDto } from '../questions/question.models';
 
 export interface PendingQuestionsResponse {

@@ -1,5 +1,7 @@
+import { inject } from '@angular/core';
 import { signalStore, withState, withMethods, withHooks, patchState } from '@ngrx/signals';
 import { AuthUser, AuthResponse } from '../auth/auth.models';
+import { GamificationStore } from './gamification.store';
 
 interface AuthState {
   user: AuthUser | null;
@@ -22,7 +24,7 @@ const initialState: AuthState = {
 export const AuthStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
-  withMethods((store) => ({
+  withMethods((store, gamStore = inject(GamificationStore)) => ({
     setSession(response: AuthResponse): void {
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
@@ -35,6 +37,7 @@ export const AuthStore = signalStore(
         isAuthenticated: true,
         isLoading: false,
       });
+      gamStore.loadGamificationData();
     },
     setTokens(accessToken: string, refreshToken: string): void {
       localStorage.setItem('accessToken', accessToken);

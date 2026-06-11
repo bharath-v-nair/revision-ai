@@ -1,7 +1,6 @@
 import { inject } from '@angular/core';
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { QuestionService } from '../questions/question.service';
-import { GamificationStore } from './gamification.store';
 import { PendingQuestionDto, AnswerResult } from '../questions/question.models';
 
 interface QuestionState {
@@ -31,7 +30,7 @@ const initialState: QuestionState = {
 export const QuestionStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
-  withMethods((store, service = inject(QuestionService), gamStore = inject(GamificationStore)) => ({
+  withMethods((store, service = inject(QuestionService)) => ({
     setPending(questions: PendingQuestionDto[]): void {
       patchState(store, { pendingQuestions: questions, currentQuestionIndex: 0 });
     },
@@ -58,7 +57,6 @@ export const QuestionStore = signalStore(
         recentAnsweredSubjectNames: recentSubjects,
       });
       service.tickStreak().subscribe();
-      gamStore.load();
     },
     markRevealed(): void {
       patchState(store, { answerState: 'revealed' });
