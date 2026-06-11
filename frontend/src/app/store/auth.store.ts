@@ -29,6 +29,7 @@ export const AuthStore = signalStore(
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
       localStorage.setItem('expiresAt', response.expiresAt);
+      localStorage.setItem('user', JSON.stringify(response.user));
       patchState(store, {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
@@ -48,6 +49,7 @@ export const AuthStore = signalStore(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('expiresAt');
+      localStorage.removeItem('user');
       patchState(store, { ...initialState });
     },
     setLoading(isLoading: boolean): void {
@@ -55,12 +57,15 @@ export const AuthStore = signalStore(
     },
   })),
   withHooks({
-    onInit(store) {
+    onInit(store, gamStore = inject(GamificationStore)) {
       const accessToken = localStorage.getItem('accessToken');
       const refreshToken = localStorage.getItem('refreshToken');
       const expiresAt = localStorage.getItem('expiresAt');
+      const userJson = localStorage.getItem('user');
       if (accessToken) {
-        patchState(store, { accessToken, refreshToken, expiresAt, isAuthenticated: true });
+        const user = userJson ? JSON.parse(userJson) : null;
+        patchState(store, { accessToken, refreshToken, expiresAt, user, isAuthenticated: true });
+        gamStore.loadGamificationData();
       }
     },
   }),
