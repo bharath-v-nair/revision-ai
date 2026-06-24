@@ -98,6 +98,42 @@ public class AnswerQuestionCommandHandler : IRequestHandler<AnswerQuestionComman
             _context.Add(schedule);
         }
 
+        // 8. Award XP for correct answers
+        if (isCorrect)
+        {
+            const int xpAmount = 10;
+
+            UserXp? userXp = await _context.UserXp
+                .FirstOrDefaultAsync(x => x.UserId == request.UserId, cancellationToken);
+
+            if (userXp is null)
+            {
+                userXp = new UserXp
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = request.UserId,
+                    TotalXp = xpAmount,
+                    CurrentLevel = 1,
+                };
+                _context.Add(userXp);
+            }
+            else
+            {
+                userXp.TotalXp += xpAmount;
+                userXp.CurrentLevel = (userXp.TotalXp / 100) + 1;
+            }
+
+            _context.Add(new XpTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = request.UserId,
+                Amount = xpAmount,
+                Reason = "CorrectAnswer",
+                QuestionId = pendingQuestion.QuestionId,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         // 7. Return response

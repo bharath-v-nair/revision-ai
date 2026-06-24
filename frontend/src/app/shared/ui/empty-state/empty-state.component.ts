@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 @Component({
@@ -14,6 +14,13 @@ import { RouterLink } from '@angular/router';
            class="mt-2 px-6 py-2 bg-primary text-white rounded-full text-sm font-medium">
           {{ ctaLabel() }}
         </a>
+      } @else if (ctaLabel()) {
+        <button
+          type="button"
+          class="mt-2 px-6 py-2 bg-primary text-white rounded-full text-sm font-medium active:scale-95 transition-transform"
+          (click)="ctaClick.emit()">
+          {{ ctaLabel() }}
+        </button>
       }
     </div>
   `,
@@ -24,4 +31,5 @@ export class EmptyStateComponent {
   readonly subtitle = input.required<string>();
   readonly ctaLabel = input<string | undefined>(undefined);
   readonly ctaRoute = input<string | undefined>(undefined);
+  readonly ctaClick = output<void>();
 }

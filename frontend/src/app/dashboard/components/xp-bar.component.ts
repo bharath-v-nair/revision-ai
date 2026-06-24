@@ -1,10 +1,4 @@
-import {
-  Component,
-  input,
-  viewChild,
-  ElementRef,
-  AfterViewInit,
-} from '@angular/core';
+import { Component, input, viewChild, ElementRef, effect } from '@angular/core';
 import gsap from 'gsap';
 
 @Component({
@@ -30,18 +24,21 @@ import gsap from 'gsap';
     </div>
   `,
 })
-export class XpBarComponent implements AfterViewInit {
+export class XpBarComponent {
   readonly totalXp = input.required<number>();
   readonly xpToNextLevel = input.required<number>();
   readonly level = input.required<number>();
 
-  private barRef = viewChild<ElementRef>('bar');
+  private barRef = viewChild<ElementRef<HTMLElement>>('bar');
 
-  ngAfterViewInit(): void {
-    const el = this.barRef()?.nativeElement;
-    if (!el) return;
-    const total = this.totalXp() + this.xpToNextLevel();
-    const pct = total > 0 ? (this.totalXp() / total) * 100 : 0;
-    gsap.to(el, { width: `${pct}%`, duration: 0.6, ease: 'power2.out' });
+  constructor() {
+    // Re-run whenever totalXp, xpToNextLevel, or barRef (view init) change.
+    effect(() => {
+      const total = this.totalXp() + this.xpToNextLevel();
+      const pct = total > 0 ? (this.totalXp() / total) * 100 : 0;
+      const el = this.barRef()?.nativeElement;
+      if (!el) return;
+      gsap.to(el, { width: `${pct}%`, duration: 0.8, ease: 'power2.out' });
+    });
   }
 }
