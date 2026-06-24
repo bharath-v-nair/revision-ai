@@ -30,6 +30,11 @@ export const routes: Routes = [
       { path: 'mock/:id', loadComponent: () => import('./mock/taker/mock-taker.page') },
       { path: 'mock/:id/results', loadComponent: () => import('./mock/results/mock-results.page') },
 
+      // PYQs (Previous Year Questions)
+      { path: 'pyqs', loadComponent: () => import('./pyqs/pyq-browser.page') },
+      { path: 'pyqs/:subjectSlug', loadComponent: () => import('./pyqs/paper-list/pyq-paper-list.page') },
+      { path: 'pyqs/:subjectSlug/:examName/mock', loadComponent: () => import('./pyqs/mock/pyq-mock.page') },
+
       // Bookmarks
       { path: 'bookmarks', loadComponent: () => import('./bookmarks/collections/bookmark-collections.page') },
       { path: 'bookmarks/:id', loadComponent: () => import('./bookmarks/items/bookmark-items.page') },

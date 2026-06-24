@@ -237,6 +237,19 @@ import { SrStatsDto } from '../review/review.models';
           </div>
           <span class="text-white/60 text-lg">→</span>
         </button>
+        <button
+          routerLink="/pyqs"
+          class="col-span-2 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between hover:bg-gray-50 active:bg-gray-100 transition-colors"
+        >
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">📝</span>
+            <div class="text-left">
+              <p class="text-sm font-semibold text-gray-700">Previous Year Questions</p>
+              <p class="text-xs text-gray-500 mt-0.5">Take a full mock from a real exam paper</p>
+            </div>
+          </div>
+          <span class="text-gray-300 text-lg">→</span>
+        </button>
       </div>
 
     </div>
