@@ -223,6 +223,220 @@ public static class SeedQuestions
         return (totalInserted, totalSkipped);
     }
 
+    // PYQ chapter number offset — PYQ papers live in 901+ range to avoid collision with topic chapters
+    private const int PYQChapterOffset = 900;
+
+    /// <summary>
+    /// Seeds PYQ chapters from pipeline/output/previous_years/ into their real subjects.
+    /// Each chapter JSON carries a "subject" field (slug) that routes it to the right Subject.
+    /// DB ChapterNumber = original TOC chapter number + 900 (avoids colliding with topic chapters).
+    /// Invoked via: dotnet run --project src/RevisionAI.Api -- --seed previous_years
+    /// </summary>
+    public static async Task<(int Inserted, int Skipped)> SeedPYQAsync(
+        AppDbContext dbContext,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("=== SeedQuestions: Starting PYQ seeding from previous_years ===");
+
+        string cwd = Directory.GetCurrentDirectory();
+        string pyqRoot = FindPYQRoot(cwd);
+        logger.LogInformation("PYQ pipeline root: {Root}", pyqRoot);
+
+        // Load audit report (optional)
+        string auditReportPath = Path.Combine(pyqRoot, "audit_report.json");
+        HashSet<(int ChapterNum, int QuestionNum)> failedQuestions = new();
+        if (File.Exists(auditReportPath))
+        {
+            string auditJson = await File.ReadAllTextAsync(auditReportPath, cancellationToken);
+            AuditReport? auditReport = JsonSerializer.Deserialize<AuditReport>(auditJson, JsonOptions);
+            if (auditReport?.PerChapter is not null)
+            {
+                foreach (AuditChapter chapter in auditReport.PerChapter)
+                {
+                    foreach (AuditFailure failure in chapter.Failures ?? [])
+                    {
+                        failedQuestions.Add((chapter.ChapterNumber, failure.QuestionNumber));
+                    }
+                }
+                logger.LogInformation("Loaded {Count} failed questions from audit report", failedQuestions.Count);
+            }
+        }
+
+        // Discover chapter JSONs in previous_years output
+        List<string> jsonFiles = DiscoverJsonFiles(pyqRoot);
+        logger.LogInformation("Discovered {Count} PYQ chapter files", jsonFiles.Count);
+
+        // Subject cache: slug → Subject entity
+        Dictionary<string, Subject> subjectCache = new(StringComparer.OrdinalIgnoreCase);
+
+        int totalInserted = 0;
+        int totalSkipped = 0;
+
+        foreach (string jsonPath in jsonFiles.OrderBy(f => f, StringComparer.Ordinal))
+        {
+            try
+            {
+                string jsonContent = await File.ReadAllTextAsync(jsonPath, cancellationToken);
+                ChapterJson? chapterJson = JsonSerializer.Deserialize<ChapterJson>(jsonContent, JsonOptions);
+
+                if (chapterJson is null || chapterJson.Questions is null || chapterJson.Questions.Count == 0)
+                {
+                    logger.LogWarning("Empty or invalid JSON: {Path}", jsonPath);
+                    continue;
+                }
+
+                // Resolve subject slug from chapter JSON
+                string subjectSlug = chapterJson.Subject ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(subjectSlug))
+                {
+                    logger.LogWarning("Chapter {Num} has no 'subject' field — skipping", chapterJson.ChapterNumber);
+                    continue;
+                }
+
+                // Find or create the real subject
+                if (!subjectCache.TryGetValue(subjectSlug, out Subject? subject))
+                {
+                    subject = await dbContext.Subjects
+                        .FirstOrDefaultAsync(s => EF.Functions.ILike(s.Slug, subjectSlug), cancellationToken);
+
+                    if (subject is null)
+                    {
+                        string displayName = ResolveSubjectDisplayName(subjectSlug);
+                        int seed = GetSubjectSeed(subjectSlug);
+                        subject = new Subject
+                        {
+                            Id = CreateSubjectGuid(seed),
+                            Name = displayName,
+                            Slug = subjectSlug,
+                        };
+                        dbContext.Subjects.Add(subject);
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                        logger.LogInformation("Created subject '{Slug}' with Id: {SubjectId}", subjectSlug, subject.Id);
+                    }
+
+                    subjectCache[subjectSlug] = subject;
+                }
+
+                // Derive from filename if chapterNumber is missing
+                if (chapterJson.ChapterNumber == 0)
+                {
+                    chapterJson.ChapterNumber = ExtractChapterNumberFromPath(jsonPath);
+                }
+
+                // PYQ chapters use chapterNumber + PYQChapterOffset in DB
+                int dbChapterNumber = chapterJson.ChapterNumber + PYQChapterOffset;
+
+                // Create a synthetic ChapterJson copy with the DB chapter number for FindOrCreateChapterAsync
+                ChapterJson dbChapterJson = new()
+                {
+                    Subject = chapterJson.Subject,
+                    ChapterTitle = chapterJson.ChapterTitle,
+                    ChapterNumber = dbChapterNumber,
+                    SourcePages = chapterJson.SourcePages,
+                    Questions = chapterJson.Questions,
+                };
+
+                logger.LogInformation(
+                    "Processing PYQ Ch {TocNum} → DB Ch {DbNum}: {Title} ({Count} questions, subject={Slug})",
+                    chapterJson.ChapterNumber,
+                    dbChapterNumber,
+                    chapterJson.ChapterTitle ?? "(unknown)",
+                    chapterJson.Questions.Count,
+                    subjectSlug);
+
+                Chapter chapter = await FindOrCreateChapterAsync(
+                    dbContext, subject.Id, dbChapterJson, cancellationToken);
+
+                // Media prefix: PYQ assets live in previous_years directory
+                string mediaPrefix = $"/media/previous_years/chapter_{chapterJson.ChapterNumber}/assets/";
+
+                List<Question> newQuestions = new();
+                List<QuestionMedia> newMedia = new();
+                int chapterInserted = 0;
+                int chapterSkipped = 0;
+
+                foreach (QuestionJson qj in chapterJson.Questions)
+                {
+                    if (failedQuestions.Contains((chapterJson.ChapterNumber, qj.QuestionNumber)))
+                    {
+                        chapterSkipped++;
+                        LogSkippedQuestion(logger, chapterJson.ChapterNumber, qj.QuestionNumber);
+                        continue;
+                    }
+
+                    Question question = MapQuestion(qj, subject.Id, chapter.Id);
+                    newQuestions.Add(question);
+
+                    if (qj.Media is { Count: > 0 })
+                    {
+                        foreach (JsonElement element in qj.Media)
+                        {
+                            MediaJson? media = TryDeserializeMedia(element);
+                            if (media is not null)
+                                newMedia.Add(MapMedia(media, question.Id, isExplanation: false, mediaPrefix));
+                        }
+                    }
+
+                    if (qj.ExplanationMedia is { Count: > 0 })
+                    {
+                        foreach (JsonElement element in qj.ExplanationMedia)
+                        {
+                            MediaJson? media = TryDeserializeMedia(element);
+                            if (media is not null)
+                                newMedia.Add(MapMedia(media, question.Id, isExplanation: true, mediaPrefix));
+                        }
+                    }
+
+                    chapterInserted++;
+                }
+
+                if (newQuestions.Count > 0)
+                {
+                    await dbContext.Questions.AddRangeAsync(newQuestions, cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+
+                    if (newMedia.Count > 0)
+                    {
+                        await dbContext.QuestionMedia.AddRangeAsync(newMedia, cancellationToken);
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
+
+                    logger.LogInformation(
+                        "  DB Ch {DbNum}: Inserted {Inserted} questions, {Media} media, Skipped {Skipped}",
+                        dbChapterNumber, chapterInserted, newMedia.Count, chapterSkipped);
+                }
+
+                totalInserted += chapterInserted;
+                totalSkipped += chapterSkipped;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to process PYQ file: {Path}", jsonPath);
+            }
+        }
+
+        logger.LogInformation("=== SeedQuestions: PYQ seeding complete ===");
+        logger.LogInformation("  Questions inserted: {Inserted}", totalInserted);
+        logger.LogInformation("  Questions skipped:  {Skipped}", totalSkipped);
+        return (totalInserted, totalSkipped);
+    }
+
+    private static string FindPYQRoot(string cwd)
+    {
+        string? current = Path.GetFullPath(cwd);
+        for (int i = 0; i < 10; i++)
+        {
+            string test = Path.Combine(current, "pipeline", "output", "previous_years");
+            if (Directory.Exists(test))
+                return test;
+            string? parent = Path.GetDirectoryName(current);
+            if (parent is null || parent == current) break;
+            current = parent;
+        }
+        return Path.GetFullPath(Path.Combine(cwd, "pipeline", "output", "previous_years"));
+    }
+
     /// <summary>
     /// Maps subject slug to the display name used in Subjects table.
     /// </summary>
@@ -326,7 +540,8 @@ public static class SeedQuestions
         List<string> files = new();
 
         // Scan all subdirectories matching chapter_{N}/chapter_{N}_questions.json
-        for (int i = 1; i <= 100; i++)
+        // Range 1-100: topic chapters; 101-999: reserved for PYQ (901+) and future use
+        for (int i = 1; i <= 999; i++)
         {
             string subDirPath = Path.Combine(root, $"chapter_{i}", $"chapter_{i}_questions.json");
             if (File.Exists(subDirPath))
@@ -411,8 +626,8 @@ public static class SeedQuestions
         Difficulty = null,
         SourcePage = json.SourcePage,
         HasMedia = json.HasMedia,
-        IsPYQ = false,
-        ExamName = null,
+        IsPYQ = json.IsPYQ,
+        ExamName = json.ExamName,
         CreatedAt = DateTime.UtcNow,
     };
 
@@ -546,6 +761,11 @@ public static class SeedQuestions
         public int ChapterNumber { get; set; }
         public SourcePagesJson? SourcePages { get; set; }
         public List<QuestionJson>? Questions { get; set; }
+        // PYQ-specific fields
+        public bool IsPYQChapter { get; set; }
+        public string? ExamName { get; set; }
+        public string? ExamType { get; set; }
+        public int? ExamYear { get; set; }
     }
 
     private sealed class SourcePagesJson
@@ -566,6 +786,11 @@ public static class SeedQuestions
         public bool ExplanationHasMedia { get; set; }
         public List<JsonElement>? Media { get; set; }
         public List<JsonElement>? ExplanationMedia { get; set; }
+        // PYQ-specific fields
+        public bool IsPYQ { get; set; }
+        public string? ExamName { get; set; }
+        public string? ExamType { get; set; }
+        public int? ExamYear { get; set; }
     }
 
     private sealed class MediaJson

@@ -61,7 +61,9 @@ static async Task RunSeeder(string[] cliArgs)
     AppDbContext dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     ILogger<AppDbContext> logger = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
 
-    (int inserted, int skipped) = await SeedQuestions.SeedSubjectAsync(dbContext, logger, subjectName);
+    (int inserted, int skipped) = subjectName.Equals("previous_years", StringComparison.OrdinalIgnoreCase)
+        ? await SeedQuestions.SeedPYQAsync(dbContext, logger)
+        : await SeedQuestions.SeedSubjectAsync(dbContext, logger, subjectName);
     Log.Information("Seeding completed: {Inserted} inserted, {Skipped} skipped", inserted, skipped);
 }
 
