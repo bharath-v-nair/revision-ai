@@ -50,15 +50,17 @@ public class PyqsController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint 3: Fetch every question for a given exam paper (full mock). examName is URL-encoded.
+    /// Endpoint 3: Fetch every question for a given subject's exam paper (full mock).
+    /// Scoped by subjectSlug because ExamName is not unique across subjects. examName is URL-encoded.
     /// </summary>
-    [HttpGet("papers/{examName}/questions")]
+    [HttpGet("subjects/{subjectSlug}/papers/{examName}/questions")]
     public async Task<ActionResult<GetPyqPaperQuestionsResponse>> GetPyqPaperQuestions(
+        string subjectSlug,
         string examName,
         CancellationToken cancellationToken)
     {
         GetPyqPaperQuestionsResponse? result = await _mediator.Send(
-            new GetPyqPaperQuestionsQuery { ExamName = examName }, cancellationToken);
+            new GetPyqPaperQuestionsQuery { SubjectSlug = subjectSlug, ExamName = examName }, cancellationToken);
 
         if (result is null)
         {

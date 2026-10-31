@@ -78,6 +78,7 @@ docs/TESTING-GUIDE.md
 # ===== AI Tool Config (local, not for GitHub) =====
 .claudeignore
 .clineignore
+.claude/
 
 # ===== Pipeline Temp Files (Not for GitHub) =====
 temp_*.png
@@ -126,3 +127,18 @@ docs/MEDIA-IMAGES-GUIDE.md
 test_*.png
 test_*.jpeg
 render_*.py
+
+#===== Root-level scratch (only backend/ + frontend/ belong on remote) =====
+# Anchored to repo root — does NOT affect backend/ or frontend/ subdirs.
+/*.py
+/*.sh
+/*.txt
+/*.pdf
+/*.jpeg
+/*.jpg
+/*.png
+/*.json
+/test_images/
+/local_temp/
+docs/MASTER-PLAN.md
+docs/ROADMAP-Phase-4-5.md

@@ -40,7 +40,7 @@ type CardState = 'idle' | 'selected' | 'submitting' | 'revealed' | 'completed';
       <!-- Top bar -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
         <div class="flex items-center gap-3">
-          @if (mode() !== 'mock') {
+          @if (mode() !== 'mock' && showSkip()) {
             <button
               class="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200"
               (click)="skipped.emit()"
@@ -190,6 +190,13 @@ export class QuestionCardComponent {
   readonly totalQuestions = input<number>(1);
   readonly pendingQuestionId = input<string>('');
   readonly initialSelectedOption = input<string | null>(null);
+  // When the card opens on an already-answered question (review/practice mock),
+  // this locks it into its revealed state so it can't be re-submitted — preventing
+  // double XP / double scoring when the user navigates back to it.
+  readonly initialResult = input<AnswerResult | null>(null);
+  // Lets hosts that provide their own navigation (e.g. the PYQ mock's Prev/Next)
+  // hide the built-in skip control.
+  readonly showSkip = input<boolean>(true);
 
   readonly isReported = input<boolean>(false);
 
@@ -248,10 +255,17 @@ export class QuestionCardComponent {
         });
       }, 0);
 
-      // In mock mode: restore the previously selected option when navigating back
+      // Restore prior answer state when navigating back to a question.
       const mode = untracked(() => this.mode());
       const initSel = untracked(() => this.initialSelectedOption());
-      if (mode === 'mock' && initSel) {
+      const initResult = untracked(() => this.initialResult());
+      if (initResult && initSel) {
+        // Already answered (review/practice mock) — lock into the revealed state so
+        // options are disabled and it can't be re-submitted (no double XP / score).
+        this.selectedOption.set(initSel);
+        this.result.set(initResult);
+        this.cardState.set('revealed');
+      } else if (mode === 'mock' && initSel) {
         this.selectedOption.set(initSel);
         this.cardState.set('selected');
       }
@@ -401,7 +415,7 @@ export class QuestionCardComponent {
 
   protected onTouchEnd(e: TouchEvent): void {
     const delta = e.changedTouches[0].clientX - this.touchStartX;
-    if (delta < -80) this.skipped.emit();
+    if (delta < -80 && this.showSkip()) this.skipped.emit();
   }
 
   protected onDoubleTap(): void {

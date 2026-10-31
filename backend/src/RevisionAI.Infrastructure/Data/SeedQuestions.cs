@@ -348,8 +348,12 @@ public static class SeedQuestions
                 Chapter chapter = await FindOrCreateChapterAsync(
                     dbContext, subject.Id, dbChapterJson, cancellationToken);
 
-                // Media prefix: PYQ assets live in previous_years directory
-                string mediaPrefix = $"/media/previous_years/chapter_{chapterJson.ChapterNumber}/assets/";
+                // Media prefix: self-describing PYQ path /media/pyq/<subject>/<paper>/
+                // e.g. /media/pyq/dermatology/neet-2024/img_3743_e1_1.jpeg — readable at a glance,
+                // unlike the old opaque /media/previous_years/chapter_180/. Synced to the same
+                // layout by pipeline/sync_pyq_media.py.
+                string paperSlug = Slugify(chapterJson.ExamName ?? $"paper-{chapterJson.ChapterNumber}");
+                string mediaPrefix = $"/media/pyq/{subjectSlug}/{paperSlug}/";
 
                 List<Question> newQuestions = new();
                 List<QuestionMedia> newMedia = new();
@@ -420,6 +424,29 @@ public static class SeedQuestions
         logger.LogInformation("  Questions inserted: {Inserted}", totalInserted);
         logger.LogInformation("  Questions skipped:  {Skipped}", totalSkipped);
         return (totalInserted, totalSkipped);
+    }
+
+    /// <summary>
+    /// Slugifies an exam name into a URL-safe paper folder, e.g.
+    /// "AIIMS 2019 (May &amp; Nov)" -> "aiims-2019-may-nov". Must match the slug used
+    /// by pipeline/sync_pyq_media.py so blobUrls resolve to files on disk.
+    /// </summary>
+    private static string Slugify(string text)
+    {
+        string lower = text.ToLowerInvariant();
+        var sb = new System.Text.StringBuilder(lower.Length);
+        foreach (char c in lower)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(c);
+            }
+            else if (sb.Length > 0 && sb[^1] != '-')
+            {
+                sb.Append('-');
+            }
+        }
+        return sb.ToString().Trim('-');
     }
 
     private static string FindPYQRoot(string cwd)

@@ -17,9 +17,9 @@ export class PyqService {
     );
   }
 
-  getPaperQuestions(examName: string): Observable<PyqPaperQuestionsDto> {
+  getPaperQuestions(subjectSlug: string, examName: string): Observable<PyqPaperQuestionsDto> {
     return this.http.get<PyqPaperQuestionsDto>(
-      `/api/pyqs/papers/${encodeURIComponent(examName)}/questions`,
+      `/api/pyqs/subjects/${encodeURIComponent(subjectSlug)}/papers/${encodeURIComponent(examName)}/questions`,
     );
   }
 }

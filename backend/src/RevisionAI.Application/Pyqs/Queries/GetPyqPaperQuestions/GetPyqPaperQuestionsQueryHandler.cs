@@ -21,9 +21,13 @@ public class GetPyqPaperQuestionsQueryHandler
     {
         // Reuses the standard question-detail shape (same as /api/questions/{id}).
         // The frontend hides CorrectOption/Explanation until the user answers.
+        // ExamName alone is NOT unique (every subject has a "NEET 2024" paper), so
+        // we MUST scope by subject too — otherwise all 19 subjects' questions leak in.
         List<QuestionDetailDto> questions = await _context.Questions
             .AsNoTracking()
-            .Where(q => q.IsPYQ && q.ExamName == request.ExamName)
+            .Where(q => q.IsPYQ
+                        && q.Subject.Slug == request.SubjectSlug
+                        && q.ExamName == request.ExamName)
             .OrderBy(q => q.QuestionNumber)
             .Select(q => new QuestionDetailDto
             {

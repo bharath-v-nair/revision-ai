@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RevisionAI — Storage Migration & Reactivation Hub</title>
+  <style>
+    :root {
+      --canvas: #faf9f5;
+      --card-bg: #ffffff;
+      --card-muted: #f4f2ea;
+      --card-highlight: #f8f6f0;
+      --text-primary: #141413;
+      --text-secondary: #5e5d59;
+      --text-muted: #8b8982;
+      --border-subtle: #e6e4dc;
+      --border-strong: #d5d2c6;
+      --accent: #d97757;
+      --accent-hover: #c46445;
+      --accent-light: #fbeee9;
+      --green: #3b7a57;
+      --green-light: #edf5f0;
+      --amber: #a86214;
+      --amber-light: #fef7ed;
+      --font-serif: "Newsreader", "Charter", "Georgia", "Iowan Old Style", "Times New Roman", serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding: 48px 24px 96px;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    /* Header styling */
+    .header {
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 32px;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent);
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 2.75rem;
+      font-weight: 500;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin-bottom: 14px;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      max-width: 720px;
+      font-weight: 400;
+      line-height: 1.55;
+    }
+
+    /* Meta Badges bar */
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+      background-color: var(--card-bg);
+      color: var(--text-secondary);
+    }
+
+    .badge-accent {
+      background-color: var(--accent-light);
+      border-color: #f2cbbf;
+      color: var(--accent);
+    }
+
+    .badge-success {
+      background-color: var(--green-light);
+      border-color: #cde4d4;
+      color: var(--green);
+    }
+
+    /* Tabs navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: 1px solid transparent;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      background-color: var(--card-muted);
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background-color: var(--card-bg);
+      color: var(--accent);
+      border-color: var(--border-subtle);
+      border-bottom: 2px solid var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    /* Tab content panes */
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Metrics Bento Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+
+    @media (max-width: 768px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .metric-card.hero {
+      border-top: 3px solid var(--accent);
+    }
+
+    .metric-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-family: var(--font-serif);
+      font-size: 1.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    /* Audit Breakdown Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-family: var(--font-serif);
+      font-size: 1.45rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Audit Table */
+    .audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+
+    .audit-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background-color: var(--card-muted);
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    .audit-table td {
+      padding: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+    }
+
+    .audit-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .size-pill {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    .size-alert {
+      background-color: var(--accent-light);
+      color: var(--accent);
+      border: 1px solid #f0cfc5;
+    }
+
+    .size-normal {
+      background-color: var(--card-muted);
+      color: var(--text-secondary);
+    }
+
+    /* Step card */
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 26px;
+      margin-bottom: 20px;
+      transition: border-color 0.15s ease;
+      position: relative;
+    }
+
+    .step-card:hover {
+      border-color: var(--border-strong);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background-color: var(--card-muted);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+
+    .step-num.active {
+      background-color: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .step-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      flex-grow: 1;
+    }
+
+    .step-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    /* Code blocks with copy */
+    .code-container {
+      position: relative;
+      background-color: #1a1a19;
+      border-radius: 6px;
+      border: 1px solid #2d2d2a;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px;
+      background-color: #141413;
+      border-bottom: 1px solid #2d2d2a;
+      font-size: 11px;
+      color: #8b8982;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    pre {
+      padding: 16px;
+      color: #f4f2ea;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .copy-btn {
+      background-color: #2d2d2a;
+      border: 1px solid #44433e;
+      color: #d5d2c6;
+      font-size: 11px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background-color: #44433e;
+      color: #ffffff;
+    }
+
+    .copy-btn.copied {
+      background-color: var(--green);
+      border-color: var(--green);
+      color: #ffffff;
+    }
+
+    /* Alerts */
+    .callout {
+      border-left: 3px solid var(--accent);
+      background-color: var(--accent-light);
+      padding: 16px 18px;
+      border-radius: 0 6px 6px 0;
+      margin: 18px 0;
+      font-size: 13.5px;
+      color: #5c2f1f;
+      line-height: 1.55;
+    }
+
+    .callout-success {
+      border-left-color: var(--green);
+      background-color: var(--green-light);
+      color: #1e4530;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Storage Progress Bar */
+    .progress-bar-container {
+      background-color: var(--card-muted);
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      margin: 14px 0 6px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--accent);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* FAQ accordion */
+    .faq-item {
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 18px 0;
+    }
+
+    .faq-item:last-child {
+      border-bottom: none;
+    }
+
+    .faq-question {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .faq-answer {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 64px;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Top Eyebrow & Title -->
+    <header class="header">
+      <div class="eyebrow">RevisionAI Engineering Ops</div>
+      <h1>Project Parking & Reactivation Playbook</h1>
+      <p class="subtitle">
+        Safely offloading 12 GB from MacBook internal storage to the external NVMe SSD (WD-SN570-1TB) during your multi-week development pause.
+      </p>
+
+      <div class="meta-bar">
+        <span class="badge badge-accent">MacBook SSD: 245 GB free</span>
+        <span class="badge badge-success">Target SSD: WD-SN570 (929 GB free, APFS)</span>
+        <span class="badge">Reclaimable: ~12.02 GB</span>
+        <span class="badge">Safe Mode: Git Cloud Guarded</span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('parking')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Phase 1: Safe Parking (Offload)
+      </button>
+      <button class="tab-btn" onclick="switchTab('reactivation')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Phase 2: Reactivation (Resume)
+      </button>
+      <button class="tab-btn" onclick="switchTab('audit')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Deep Audit & Git FAQ
+      </button>
+    </div>
+
+    <!-- TAB 1: PHASE 1 (PARKING) -->
+    <main id="pane-parking" class="tab-pane active">
+      
+      <!-- Progress Bar Card -->
+      <div class="card" style="padding: 20px 24px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Migration Progress Tracker</span>
+          <span id="progress-percent" style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent);">0% Complete</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar-fill"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+          <span>Check off each completed step below</span>
+          <span id="reclaimed-text">0.0 GB reclaimed</span>
+        </div>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num active">1</div>
+          <div class="step-title">Stage Unsaved Work & Push to GitHub Cloud</div>
+          <input type="checkbox" class="step-checkbox" id="step1" onchange="updateProgress(1, 0.5)">
+        </div>
+        <p class="step-desc">
+          <strong>Crucial Safeguard:</strong> You currently have <strong>8 modified files</strong> (PYQ mock UI and question controllers) and <strong>6 unpushed commits</strong>. Pushing to GitHub guarantees that your code is 100% cloud-backed before moving anything.
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal (Run in RevisionAI root)</span>
+            <button class="copy-btn" onclick="copyCode('code-step1', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step1">cd /Users/bharathnair/Projects/RevisionAI
+
+# 1. Stage and commit remaining PYQ mock fixes
+git add .
+git commit -m "feat(pyqs): save mock taker and question card progress before parking"
+
+# 2. Push all commits safely to GitHub
+git push origin main</pre>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div class="step-title">Clean Local Git Garbage (Reclaims ~5 GB)</div>
+          <input type="checkbox" class="step-checkbox" id="step2" onchange="updateProgress(2, 5.0)">
+        </div>
+        <p class="step-desc">
+          Nukes the 1.67 GB interrupted packfile (<code>tmp_pack_ilqDqL</code>) and compresses loose PDF image extractions. Does NOT affect your code or branches.
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-step2', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step2"># Prune dangling objects and run aggressive garbage collection
+git prune
+git gc --prune=now
+
+# Verify size dropped from 6.8 GB to ~1.8 GB
+du -sh .git</pre>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div class="step-title">Nuke Disposable Build Caches (Reclaims ~450 MB)</div>
+          <input type="checkbox" class="step-checkbox" id="step3" onchange="updateProgress(3, 0.45)">
+        </div>
+        <p class="step-desc">
+          Removes compiled <code>bin/obj</code> and frontend <code>node_modules</code>. These are easily restored with one command when reactivating.
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-step3', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step3"># Clean .NET build outputs
+cd backend
+dotnet clean
+rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj
+
+# Clean Angular node_modules and cache
+cd ../frontend
+rm -rf node_modules .angular .output dist
+
+cd ..</pre>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">4</div>
+          <div class="step-title">Rsync Entire Cleaned Project to External SSD</div>
+          <input type="checkbox" class="step-checkbox" id="step4" onchange="updateProgress(4, 0)">
+        </div>
+        <p class="step-desc">
+          Copies the entire cleaned repository to <code>/Volumes/WD-SN570-1TB/Projects/RevisionAI</code> using <code>rsync</code> (preserves permissions, timestamps, and resumes automatically if interrupted).
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-step4', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step4"># Create destination directory
+mkdir -p /Volumes/WD-SN570-1TB/Projects
+
+# Copy entire project with progress and verification
+rsync -avP /Users/bharathnair/Projects/RevisionAI /Volumes/WD-SN570-1TB/Projects/</pre>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">5</div>
+          <div class="step-title">Integrity Verification on External SSD</div>
+          <input type="checkbox" class="step-checkbox" id="step5" onchange="updateProgress(5, 0)">
+        </div>
+        <p class="step-desc">
+          Verify that the target drive has all files intact before touching your local disk copy.
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-step5', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step5">cd /Volumes/WD-SN570-1TB/Projects/RevisionAI
+
+# 1. Verify Git recognizes repository cleanly
+git status
+
+# 2. Check PDFs and media images exist
+ls -lh pipeline/input/SOURCES/Notes | head -n 5
+ls -lh backend/src/RevisionAI.Api/wwwroot/media | head -n 5</pre>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step-card" style="border-left: 3px solid var(--accent);">
+        <div class="step-header">
+          <div class="step-num" style="background-color: var(--accent); color: #fff;">6</div>
+          <div class="step-title">Delete Local Copy from MacBook (Reclaim ~12 GB)</div>
+          <input type="checkbox" class="step-checkbox" id="step6" onchange="updateProgress(6, 6.07)">
+        </div>
+        <p class="step-desc">
+          <strong>Final Step:</strong> Only perform this once Steps 1–5 are complete and verified.
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-step6', this)">Copy Commands</button>
+          </div>
+          <pre id="code-step6"># Remove project from MacBook internal SSD
+rm -rf /Users/bharathnair/Projects/RevisionAI</pre>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- TAB 2: PHASE 2 (REACTIVATION) -->
+    <main id="pane-reactivation" class="tab-pane">
+      
+      <div class="card">
+        <div class="card-title">
+          <span>Reactivation Playbook (Resuming in 3+ Weeks)</span>
+          <span class="badge badge-success">Time required: ~3 minutes</span>
+        </div>
+        <p style="font-size: 14.5px; color: var(--text-secondary); margin-bottom: 20px;">
+          When you are ready to continue RevisionAI for your sister, follow this straightforward sequence. You will run the project directly off the WD-SN570 SSD.
+        </p>
+
+        <!-- Step A -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num active">A</div>
+            <div class="step-title">Plug in SSD & Verify Mount</div>
+          </div>
+          <p class="step-desc">
+            Connect the UGREEN enclosure. In macOS Finder, ensure <code>WD-SN570-1TB</code> appears in the sidebar.
+          </p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>Terminal</span>
+              <button class="copy-btn" onclick="copyCode('code-react-a', this)">Copy Commands</button>
+            </div>
+            <pre id="code-react-a"># Navigate to project on the external SSD
+cd /Volumes/WD-SN570-1TB/Projects/RevisionAI
+pwd</pre>
+          </div>
+        </div>
+
+        <!-- Step B -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num active">B</div>
+            <div class="step-title">Open in Antigravity or VS Code</div>
+          </div>
+          <p class="step-desc">
+            Open the folder directly on the SSD. Antigravity and VS Code will automatically detect the Git repository and workspace configurations.
+          </p>
+          <div class="callout callout-success">
+            <div class="callout-title">✓ Native Speed Guarantee</div>
+            Because your SSD is formatted in APFS and connects via NVMe USB-C, file indexing, code search, and edits run at ~1000 MB/s—indistinguishable from your internal Mac drive.
+          </div>
+        </div>
+
+        <!-- Step C -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num active">C</div>
+            <div class="step-title">One-Command Dependency Restoration</div>
+          </div>
+          <p class="step-desc">
+            Reinstalls the frontend packages and builds the backend solution.
+          </p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>Terminal</span>
+              <button class="copy-btn" onclick="copyCode('code-react-c', this)">Copy Commands</button>
+            </div>
+            <pre id="code-react-c"># 1. Restore Backend .NET dependencies & build
+cd /Volumes/WD-SN570-1TB/Projects/RevisionAI/backend
+dotnet restore
+dotnet build
+
+# 2. Restore Frontend packages
+cd ../frontend
+npm install
+
+# Return to root
+cd ..</pre>
+          </div>
+        </div>
+
+        <!-- Step D -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num active">D</div>
+            <div class="step-title">Launch Dev Servers</div>
+          </div>
+          <p class="step-desc">
+            Start the application exactly like you used to:
+          </p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>Terminal</span>
+              <button class="copy-btn" onclick="copyCode('code-react-d', this)">Copy Commands</button>
+            </div>
+            <pre id="code-react-d"># Terminal Tab 1: Backend (.NET 10 API at http://localhost:5000)
+cd /Volumes/WD-SN570-1TB/Projects/RevisionAI/backend/src/RevisionAI.Api
+dotnet run
+
+# Terminal Tab 2: Frontend (Angular 21 at http://localhost:4200)
+cd /Volumes/WD-SN570-1TB/Projects/RevisionAI/frontend
+npm start</pre>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- TAB 3: DEEP AUDIT & FAQ -->
+    <main id="pane-audit" class="tab-pane">
+      
+      <!-- Metrics Bento Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card hero">
+          <div class="metric-label">Git History & Blobs</div>
+          <div class="metric-value">6.8 GB</div>
+          <div class="metric-sub">56% of total repository</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Pipeline & PDFs</div>
+          <div class="metric-value">3.2 GB</div>
+          <div class="metric-sub">2.0 GB PDFs + 776 MB crops</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Backend + Images</div>
+          <div class="metric-value">883 MB</div>
+          <div class="metric-sub">723 MB is question media</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Frontend + Node</div>
+          <div class="metric-value">335 MB</div>
+          <div class="metric-sub">node_modules + ng cache</div>
+        </div>
+      </div>
+
+      <!-- Audit Breakdown Table -->
+      <div class="card">
+        <div class="card-title">Complete Directory Storage Audit</div>
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Actual Size</th>
+              <th>Description</th>
+              <th>Disposition</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>.git/</code></td>
+              <td><span class="size-pill size-alert">6.8 GB</span></td>
+              <td>Includes 1.67 GB interrupted pack file (<code>tmp_pack_ilqDqL</code>) and 3.3 GB loose PDF extraction blobs.</td>
+              <td>Run <code>git prune && git gc</code> to shrink down to ~1.8 GB.</td>
+            </tr>
+            <tr>
+              <td><code>pipeline/input/</code></td>
+              <td><span class="size-pill size-normal">2.0 GB</span></td>
+              <td>Raw medical PDF notes (Marrow, Prepladder, Previous Year Exam books).</td>
+              <td>Move to SSD (and retain backup on Google Drive).</td>
+            </tr>
+            <tr>
+              <td><code>backend/src/RevisionAI.Api/wwwroot/media/</code></td>
+              <td><span class="size-pill size-normal">723 MB</span></td>
+              <td>Extracted histopathology, clinical images, and medical diagrams for NEET PG questions.</td>
+              <td>Legitimate data. Keep with project on SSD.</td>
+            </tr>
+            <tr>
+              <td><code>pipeline/output/</code></td>
+              <td><span class="size-pill size-normal">776 MB</span></td>
+              <td>Extracted JSON chapter files and intermediate rendered page crops.</td>
+              <td>Keep with project on SSD.</td>
+            </tr>
+            <tr>
+              <td><code>backend/bin</code> & <code>backend/obj</code></td>
+              <td><span class="size-pill size-normal">103 MB</span></td>
+              <td>Compiled C# assemblies and debug symbol files.</td>
+              <td>Delete with <code>dotnet clean</code>.</td>
+            </tr>
+            <tr>
+              <td><code>frontend/node_modules/</code></td>
+              <td><span class="size-pill size-normal">310 MB</span></td>
+              <td>Angular and third-party NPM packages.</td>
+              <td>Delete before parking; reinstall with <code>npm i</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- FAQ Accordion -->
+      <div class="card">
+        <div class="card-title">Frequently Asked Questions</div>
+
+        <div class="faq-item">
+          <div class="faq-question">Why does local Git have 6.8 GB if the code is small?</div>
+          <div class="faq-answer">
+            Git is an append-only database. When your Python extraction scripts processed PDFs and generated hundreds of intermediate page crops, Git captured those temporary images as loose binary objects. Furthermore, an interrupted repack operation on June 4th left behind a 1.67 GB orphaned pack file (<code>tmp_pack_ilqDqL</code>).
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">What does "git prune" and "git gc" actually do?</div>
+          <div class="faq-answer">
+            <code>git prune</code> deletes all loose objects that are unreachable from any existing commit or branch. <code>git gc</code> (Garbage Collection) removes broken temporary pack files, bundles loose files into compressed packs, and optimizes the repository. It will <strong>never delete your code or commits</strong>.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">What happens if I unplug the SSD while working?</div>
+          <div class="faq-answer">
+            The path <code>/Volumes/WD-SN570-1TB/...</code> disappears. Any running command or IDE tab will immediately display "No such file or directory" and stop. It will not break your Mac. However, to prevent database corruption, always pause running processes and click "Eject" in Finder before unplugging.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">What other projects can I move right now to save space?</div>
+          <div class="faq-answer">
+            Running an audit across your <code>~/Projects</code> folder shows 14+ GB of inactive projects that can be moved immediately to your external SSD:
+            <ul style="margin: 8px 0 0 20px;">
+              <li><code>Beboo-Projects</code>: 4.1 GB</li>
+              <li><code>personal_projs</code>: 3.0 GB</li>
+              <li><code>Harness</code>: 2.8 GB</li>
+              <li><code>Training</code>: 2.7 GB</li>
+              <li><code>InterviewPrep</code>: 1.2 GB</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <span>RevisionAI Migration Protocol — Created for Bharath Nair</span>
+      <span>Antigravity Engineering Platform</span>
+    </footer>
+
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('pane-' + tabId).classList.add('active');
+    }
+
+    // Copy to clipboard
+    function copyCode(elementId, btn) {
+      const code = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = "Copied ✓";
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    // Progress Tracker
+    const stepReclaimMap = { 1: 0, 2: 5.0, 3: 0.45, 4: 0, 5: 0, 6: 6.57 };
+    function updateProgress() {
+      const checkboxes = document.querySelectorAll('.step-checkbox');
+      let checkedCount = 0;
+      let totalReclaimed = 0;
+
+      checkboxes.forEach((cb, idx) => {
+        const stepNum = idx + 1;
+        if (cb.checked) {
+          checkedCount++;
+          totalReclaimed += stepReclaimMap[stepNum] || 0;
+        }
+      });
+
+      const percent = Math.round((checkedCount / checkboxes.length) * 100);
+      document.getElementById('progress-bar').style.width = percent + '%';
+      document.getElementById('progress-percent').innerText = percent + '% Complete';
+      document.getElementById('reclaimed-text').innerText = totalReclaimed.toFixed(2) + ' GB reclaimed';
+    }
+  </script>
+</body>
+</html>
